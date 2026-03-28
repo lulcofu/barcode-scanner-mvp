@@ -64,6 +64,9 @@ class BarcodeScannerApp {
   async initialize() {
     console.log('[App] 初始化應用程式');
     
+    // 檢查 HTTPS 需求
+    this.checkHttpsRequirement();
+    
     // 初始化掃描器
     this.scanner = new BarcodeScannerCore({
       scanMode: this.scanModeSelect.value,
@@ -91,6 +94,37 @@ class BarcodeScannerApp {
     this.scanner.onError = (error) => this.handleError(error);
     
     console.log('[App] 初始化完成');
+  }
+  
+  /**
+   * 檢查 HTTPS 需求
+   */
+  checkHttpsRequirement() {
+    const isHttps = window.location.protocol === 'https:';
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1' ||
+                        window.location.hostname.startsWith('192.168.');
+    
+    const warningBanner = document.getElementById('httpsWarning');
+    
+    if (!isHttps && !isLocalhost) {
+      // 非 HTTPS 且非本地，顯示警告
+      if (warningBanner) {
+        warningBanner.style.display = 'block';
+      }
+      console.warn('[App] 非 HTTPS 連線，相機功能可能無法使用');
+    } else {
+      if (warningBanner) {
+        warningBanner.style.display = 'none';
+      }
+    }
+    
+    // 檢查瀏覽器是否支援 getUserMedia
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.warn('[App] 瀏覽器不支援 getUserMedia');
+      this.startBtn.disabled = true;
+      this.startBtn.title = '瀏覽器不支援相機功能';
+    }
   }
   
   /**
@@ -140,6 +174,20 @@ class BarcodeScannerApp {
     try {
       this.startBtn.disabled = true;
       this.scanIndicator.classList.add('active');
+      
+      // 檢查瀏覽器支援
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const isHttps = window.location.protocol === 'https:';
+        const isLocalhost = window.location.hostname === 'localhost' || 
+                           window.location.hostname === '127.0.0.1' ||
+                           window.location.hostname.startsWith('192.168.');
+        
+        if (!isHttps && !isLocalhost) {
+          throw new Error('相機需要 HTTPS 連線才能使用。\n\n請使用以下方式：\n1. 使用 HTTPS 網址存取\n2. 使用「上傳圖片」功能掃描條碼\n\n目前網址：' + window.location.href);
+        } else {
+          throw new Error('您的瀏覽器不支援相機功能，請使用較新版本的 Chrome、Firefox、Safari 或 Edge 瀏覽器。');
+        }
+      }
       
       // 取得視訊串流
       this.stream = await navigator.mediaDevices.getUserMedia({
@@ -427,6 +475,8 @@ class BarcodeScannerApp {
       border-radius: 8px;
       z-index: 9999;
       animation: fadeIn 0.3s ease;
+      max-width: 400px;
+      white-space: pre-wrap;
     `;
     
     document.body.appendChild(errorDiv);
@@ -434,7 +484,7 @@ class BarcodeScannerApp {
     setTimeout(() => {
       errorDiv.style.animation = 'fadeOut 0.3s ease';
       setTimeout(() => errorDiv.remove(), 300);
-    }, 3000);
+    }, 5000);
   }
   
   /**
