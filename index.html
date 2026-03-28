@@ -5,11 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>多條碼掃描器 MVP</title>
   <link rel="stylesheet" href="css/style.css">
+  <!-- getUserMedia polyfill（需在其他腳本之前載入） -->
+  <script>
+    if (navigator.mediaDevices === undefined) navigator.mediaDevices = {};
+    if (navigator.mediaDevices.getUserMedia === undefined) {
+      navigator.mediaDevices.getUserMedia = function(c) {
+        var g = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+        if (!g) return Promise.reject(new Error('此瀏覽器不支援相機功能'));
+        return new Promise(function(r, e) { g.call(navigator, c, r, e); });
+      };
+    }
+  </script>
   <!-- ZXing-js -->
-  <script src="https://unpkg.com/@aspect-ratio/core@latest"></script>
-  <script src="https://unpkg.com/@aspect-ratio/defaults@latest"></script>
-  <script src="https://unpkg.com/@zxing/browser@latest"></script>
-  <script src="https://unpkg.com/@aspect-ratio/defaults@latest"></script>
+  <script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
+  <script>window.ZXing = window.ZXingBrowser || window.ZXing;</script>
 </head>
 <body>
   <div class="container">

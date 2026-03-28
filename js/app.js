@@ -97,26 +97,9 @@ class BarcodeScannerApp {
   }
   
   /**
-   * 初始化 getUserMedia polyfill 並檢查相機支援
+   * 隱藏 HTTPS 警告（polyfill 已在 index.html head 中載入）
    */
   checkHttpsRequirement() {
-    // Polyfill: 相容舊版瀏覽器的 getUserMedia
-    if (navigator.mediaDevices === undefined) {
-      navigator.mediaDevices = {};
-    }
-    if (navigator.mediaDevices.getUserMedia === undefined) {
-      navigator.mediaDevices.getUserMedia = function(constraints) {
-        const getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
-        if (!getUserMedia) {
-          return Promise.reject(new Error('此瀏覽器不支援 getUserMedia'));
-        }
-        return new Promise((resolve, reject) => {
-          getUserMedia.call(navigator, constraints, resolve, reject);
-        });
-      };
-    }
-
-    // 隱藏 HTTPS 警告（不再限制協定）
     const warningBanner = document.getElementById('httpsWarning');
     if (warningBanner) {
       warningBanner.style.display = 'none';
@@ -171,14 +154,29 @@ class BarcodeScannerApp {
       this.startBtn.disabled = true;
       this.scanIndicator.classList.add('active');
       
-      // 取得視訊串流
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+      // 取得視訊串流（逐步降級相機參數以相容更多手機）
+      let stream = null;
+      const constraintsList = [
+        { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } },
+        { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } },
+        { video: { facingMode: 'environment' } },
+        { video: true }
+      ];
+
+      for (const constraints of constraintsList) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          break;
+        } catch (err) {
+          console.warn('[App] 相機參數不支援，嘗試降級:', err.message);
         }
-      });
+      }
+
+      if (!stream) {
+        throw new Error('無法開啟相機，請確認已授予相機權限');
+      }
+
+      this.stream = stream;
       
       this.video.srcObject = this.stream;
       await this.video.play();
