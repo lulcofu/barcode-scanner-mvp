@@ -39,6 +39,12 @@ class TestBarcodeGenerator {
         { value: '0012345678905', name: '物流箱條碼' }
       ]
     };
+    
+    // 變體設定
+    this.variants = {
+      sizes: ['xs', 'sm', 'md', 'lg', 'xl'],
+      rotations: [-45, -30, -15, -8, -5, 0, 5, 8, 15, 30, 45]
+    };
   }
   
   /**
@@ -106,11 +112,8 @@ class TestBarcodeGenerator {
     container.innerHTML = '';
     this.barcodes = [];
     
-    // 產生 1D 條碼
-    await this.generate1DBarcodes();
-    
-    // 產生 2D 條碼
-    await this.generate2DBarcodes();
+    // 產生基礎條碼
+    await this.generateBaseBarcodes();
     
     // 產生變體（不同大小和角度）
     await this.generateVariants();
@@ -119,31 +122,28 @@ class TestBarcodeGenerator {
   }
   
   /**
-   * 產生 1D 條碼
+   * 產生基礎條碼（各格式）
    */
-  async generate1DBarcodes() {
+  async generateBaseBarcodes() {
     const formats1D = ['ean_13', 'ean_8', 'code_128', 'code_39', 'itf'];
     
     for (const format of formats1D) {
       const data = this.testData[format];
       if (!data) continue;
       
-      for (const item of data) {
+      // 每種格式取前 2 個
+      for (let i = 0; i < Math.min(2, data.length); i++) {
+        const item = data[i];
         const card = this.createBarcodeCard(format, item.value, item.name);
         this.container.appendChild(card);
         this.barcodes.push({ format, value: item.value, element: card });
       }
     }
-  }
-  
-  /**
-   * 產生 2D 條碼
-   */
-  async generate2DBarcodes() {
+    
     // QR Code
     const qrData = this.testData.qr_code;
-    
-    for (const item of qrData) {
+    for (let i = 0; i < Math.min(2, qrData.length); i++) {
+      const item = qrData[i];
       const card = await this.createQRCard(item.value, item.name);
       this.container.appendChild(card);
       this.barcodes.push({ format: 'qr_code', value: item.value, element: card });
@@ -154,30 +154,161 @@ class TestBarcodeGenerator {
    * 產生變體（不同大小和角度）
    */
   async generateVariants() {
-    // 小型變體
-    const smallCard = this.createBarcodeCard('ean_13', '5901234123457', '小型條碼', { size: 'small' });
-    smallCard.classList.add('small');
-    this.container.appendChild(smallCard);
-    this.barcodes.push({ format: 'ean_13', value: '5901234123457', element: smallCard, variant: 'small' });
+    const formats = ['ean_13', 'code_128', 'ean_8', 'code_39', 'itf'];
     
-    // 大型變體
-    const largeCard = this.createBarcodeCard('code_128', 'PROD-XYZ-789012345', '大型條碼', { size: 'large' });
-    largeCard.classList.add('large');
-    this.container.appendChild(largeCard);
-    this.barcodes.push({ format: 'code_128', value: 'PROD-XYZ-789012345', element: largeCard, variant: 'large' });
+    // 隨機產生多種變體
+    const variantConfigs = [
+      // 超小型 + 各角度
+      { size: 'xs', rotate: -30, format: 'ean_13' },
+      { size: 'xs', rotate: 0, format: 'code_128' },
+      { size: 'xs', rotate: 15, format: 'ean_8' },
+      
+      // 小型 + 各角度
+      { size: 'sm', rotate: -15, format: 'code_39' },
+      { size: 'sm', rotate: 5, format: 'ean_13' },
+      { size: 'sm', rotate: -8, format: 'itf' },
+      
+      // 中型 + 各角度
+      { size: 'md', rotate: 8, format: 'code_128' },
+      { size: 'md', rotate: -5, format: 'ean_13' },
+      { size: 'md', rotate: 30, format: 'ean_8' },
+      
+      // 大型 + 各角度
+      { size: 'lg', rotate: -8, format: 'code_39' },
+      { size: 'lg', rotate: 15, format: 'ean_13' },
+      
+      // 超大型 + 各角度
+      { size: 'xl', rotate: -5, format: 'code_128' },
+      { size: 'xl', rotate: 0, format: 'ean_13' },
+      
+      // 極端角度
+      { size: 'md', rotate: 45, format: 'code_128' },
+      { size: 'sm', rotate: -45, format: 'ean_8' },
+    ];
     
-    // 旋轉變體（5 度）
-    const rotatedCard = this.createBarcodeCard('ean_8', '96385074', '旋轉條碼', { rotate: 5 });
-    rotatedCard.classList.add('rotated');
-    this.container.appendChild(rotatedCard);
-    this.barcodes.push({ format: 'ean_8', value: '96385074', element: rotatedCard, variant: 'rotated' });
+    for (const config of variantConfigs) {
+      const value = this.getRandomValue(config.format);
+      const card = this.createBarcodeCard(config.format, value, `變體 ${config.size}/${config.rotate}°`, {
+        size: config.size,
+        rotate: config.rotate
+      });
+      
+      card.classList.add(`size-${config.size}`);
+      if (config.rotate !== 0) {
+        card.classList.add('rotated');
+      }
+      
+      this.container.appendChild(card);
+      this.barcodes.push({ 
+        format: config.format, 
+        value: value, 
+        element: card, 
+        variant: `${config.size}/${config.rotate}°` 
+      });
+    }
     
-    // 旋轉變體（-5 度）
-    const rotatedCard2 = this.createBarcodeCard('code_39', 'TEST-123', '反向旋轉', { rotate: -8 });
-    rotatedCard2.classList.add('rotated');
-    rotatedCard2.style.transform = `rotate(-8deg)`;
-    this.container.appendChild(rotatedCard2);
-    this.barcodes.push({ format: 'code_39', value: 'TEST-123', element: rotatedCard2, variant: 'rotated' });
+    // QR Code 變體（不同大小）
+    const qrVariants = [
+      { size: 'sm', value: 'https://test.com/qr/001' },
+      { size: 'lg', value: 'QR-TEST-' + Date.now() },
+    ];
+    
+    for (const v of qrVariants) {
+      const card = await this.createQRCard(v.value, `QR ${v.size}`, { size: v.size });
+      card.classList.add(`size-${v.size}`);
+      this.container.appendChild(card);
+      this.barcodes.push({ format: 'qr_code', value: v.value, element: card, variant: v.size });
+    }
+  }
+  
+  /**
+   * 取得隨機值
+   */
+  getRandomValue(format) {
+    switch (format) {
+      case 'ean_13':
+        return this.generateRandomEAN13();
+      case 'ean_8':
+        return this.generateRandomEAN8();
+      case 'code_128':
+        return this.generateRandomCode128();
+      case 'code_39':
+        return this.generateRandomCode39();
+      case 'itf':
+        return this.generateRandomITF();
+      default:
+        return this.generateRandomCode128();
+    }
+  }
+  
+  /**
+   * 產生隨機 EAN-13
+   */
+  generateRandomEAN13() {
+    let code = '';
+    for (let i = 0; i < 12; i++) {
+      code += Math.floor(Math.random() * 10);
+    }
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      sum += parseInt(code[i]) * (i % 2 === 0 ? 1 : 3);
+    }
+    code += (10 - (sum % 10)) % 10;
+    return code;
+  }
+  
+  /**
+   * 產生隨機 EAN-8
+   */
+  generateRandomEAN8() {
+    let code = '';
+    for (let i = 0; i < 7; i++) {
+      code += Math.floor(Math.random() * 10);
+    }
+    let sum = 0;
+    for (let i = 0; i < 7; i++) {
+      sum += parseInt(code[i]) * (i % 2 === 0 ? 3 : 1);
+    }
+    code += (10 - (sum % 10)) % 10;
+    return code;
+  }
+  
+  /**
+   * 產生隨機 Code-128
+   */
+  generateRandomCode128() {
+    const prefixes = ['PROD', 'SN', 'LOT', 'BATCH', 'INV', 'ORD'];
+    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = prefix + '-';
+    for (let i = 0; i < 8 + Math.floor(Math.random() * 8); i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
+  }
+  
+  /**
+   * 產生隨機 Code-39
+   */
+  generateRandomCode39() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.';
+    let code = '';
+    for (let i = 0; i < 6 + Math.floor(Math.random() * 6); i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
+  }
+  
+  /**
+   * 產生隨機 ITF
+   */
+  generateRandomITF() {
+    let code = '';
+    const length = 12 + Math.floor(Math.random() * 4) * 2; // ITF 需要偶數長度
+    for (let i = 0; i < length; i++) {
+      code += Math.floor(Math.random() * 10);
+    }
+    return code;
   }
   
   /**
@@ -186,9 +317,17 @@ class TestBarcodeGenerator {
   createBarcodeCard(format, value, name, options = {}) {
     const card = document.createElement('div');
     card.className = 'test-barcode-card';
-    if (options.size) {
-      card.classList.add(options.size);
-    }
+    
+    // 大小設定
+    const sizeConfig = {
+      'xs': { width: 0.8, height: 25, fontSize: 8 },
+      'sm': { width: 1.2, height: 40, fontSize: 10 },
+      'md': { width: 2, height: 60, fontSize: 12 },
+      'lg': { width: 2.5, height: 80, fontSize: 14 },
+      'xl': { width: 3, height: 100, fontSize: 16 }
+    };
+    
+    const size = sizeConfig[options.size] || sizeConfig['md'];
     
     // 建立畫布
     const canvas = document.createElement('canvas');
@@ -206,17 +345,18 @@ class TestBarcodeGenerator {
       
       JsBarcode(canvas, value, {
         format: formatMap[format] || format,
-        width: options.size === 'small' ? 1 : options.size === 'large' ? 3 : 2,
-        height: options.size === 'small' ? 40 : options.size === 'large' ? 120 : 80,
+        width: size.width,
+        height: size.height,
         displayValue: true,
-        fontSize: options.size === 'small' ? 10 : options.size === 'large' ? 16 : 12,
+        fontSize: size.fontSize,
         margin: 5,
         background: '#ffffff'
       });
       
       // 旋轉
-      if (options.rotate) {
-        canvas.style.transform = `rotate(${options.rotate}deg)`;
+      if (options.rotate && options.rotate !== 0) {
+        card.style.transform = `rotate(${options.rotate}deg)`;
+        card.classList.add('rotated');
       }
       
     } catch (e) {
@@ -235,6 +375,14 @@ class TestBarcodeGenerator {
     const formatBadge = document.createElement('span');
     formatBadge.className = 'format';
     formatBadge.textContent = format.replace('_', '-').toUpperCase();
+    
+    // 變體標籤
+    if (options.size || options.rotate) {
+      const variantBadge = document.createElement('span');
+      variantBadge.className = 'variant';
+      variantBadge.textContent = `${options.size || 'md'}${options.rotate ? '/' + options.rotate + '°' : ''}`;
+      formatBadge.textContent += ` (${variantBadge.textContent})`;
+    }
     
     // 值
     const valueSpan = document.createElement('div');
@@ -258,18 +406,29 @@ class TestBarcodeGenerator {
   /**
    * 建立 QR Code 卡片
    */
-  async createQRCard(value, name) {
+  async createQRCard(value, name, options = {}) {
     const card = document.createElement('div');
     card.className = 'test-barcode-card';
+    
+    // 大小設定
+    const sizeConfig = {
+      'xs': 60,
+      'sm': 80,
+      'md': 100,
+      'lg': 130,
+      'xl': 160
+    };
+    
+    const qrSize = sizeConfig[options.size] || 100;
     
     // 建立 QR Code 容器
     const qrContainer = document.createElement('div');
     qrContainer.style.background = '#fff';
     qrContainer.style.padding = '10px';
+    qrContainer.style.display = 'inline-block';
     
     try {
       // 使用 QRCode.js 產生
-      const qrSize = 100;
       new QRCode(qrContainer, {
         text: value,
         width: qrSize,
@@ -281,13 +440,16 @@ class TestBarcodeGenerator {
       
     } catch (e) {
       console.error('[Generator] 產生 QR Code 失敗:', e);
-      qrContainer.innerHTML = '<div style="width:100px;height:100px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;">QR</div>';
+      qrContainer.innerHTML = `<div style="width:${qrSize}px;height:${qrSize}px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;">QR</div>`;
     }
     
     // 格式標籤
     const formatBadge = document.createElement('span');
     formatBadge.className = 'format';
     formatBadge.textContent = 'QR CODE';
+    if (options.size) {
+      formatBadge.textContent += ` (${options.size})`;
+    }
     
     // 值
     const valueSpan = document.createElement('div');
@@ -316,7 +478,6 @@ class TestBarcodeGenerator {
       await navigator.clipboard.writeText(text);
       return true;
     } catch (e) {
-      // 備用方法
       const textarea = document.createElement('textarea');
       textarea.value = text;
       document.body.appendChild(textarea);
@@ -331,11 +492,8 @@ class TestBarcodeGenerator {
    * 顯示 Toast 訊息
    */
   showToast(message) {
-    // 移除現有 Toast
     const existing = document.querySelector('.toast-message');
-    if (existing) {
-      existing.remove();
-    }
+    if (existing) existing.remove();
     
     const toast = document.createElement('div');
     toast.className = 'toast-message';
@@ -362,67 +520,41 @@ class TestBarcodeGenerator {
   }
   
   /**
-   * 產生隨機測試資料
-   */
-  generateRandomData() {
-    // 隨機 EAN-13
-    const randomEAN13 = () => {
-      let code = '';
-      for (let i = 0; i < 12; i++) {
-        code += Math.floor(Math.random() * 10);
-      }
-      // 計算檢查碼
-      let sum = 0;
-      for (let i = 0; i < 12; i++) {
-        sum += parseInt(code[i]) * (i % 2 === 0 ? 1 : 3);
-      }
-      code += (10 - (sum % 10)) % 10;
-      return code;
-    };
-    
-    // 隨機 Code-128
-    const randomCode128 = () => {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-';
-      let code = 'PROD-';
-      for (let i = 0; i < 10; i++) {
-        code += chars[Math.floor(Math.random() * chars.length)];
-      }
-      return code;
-    };
-    
-    // 隨機 QR Code
-    const randomQR = () => {
-      return `https://example.com/product/${Date.now()}`;
-    };
-    
-    return {
-      ean_13: randomEAN13(),
-      code_128: randomCode128(),
-      qr_code: randomQR()
-    };
-  }
-  
-  /**
-   * 重新產生測試條碼
+   * 重新產生測試條碼（完全隨機）
    */
   async regenerate() {
     if (!this.container) return;
     
-    // 加入新的隨機資料
-    const random = this.generateRandomData();
+    // 清空現有資料
+    this.container.innerHTML = '';
+    this.barcodes = [];
     
-    this.testData.ean_13.push({ value: random.ean_13, name: '隨機商品' });
-    this.testData.code_128.push({ value: random.code_128, name: '隨機序號' });
+    // 產生新的隨機基礎條碼
+    const baseFormats = ['ean_13', 'ean_8', 'code_128', 'code_39', 'itf'];
     
-    // 限制數量
-    if (this.testData.ean_13.length > 8) {
-      this.testData.ean_13 = this.testData.ean_13.slice(-8);
+    for (const format of baseFormats) {
+      // 每種格式產生 1-2 個隨機條碼
+      const count = 1 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < count; i++) {
+        const value = this.getRandomValue(format);
+        const card = this.createBarcodeCard(format, value, `隨機 ${format.toUpperCase()}`);
+        this.container.appendChild(card);
+        this.barcodes.push({ format, value, element: card });
+      }
     }
-    if (this.testData.code_128.length > 6) {
-      this.testData.code_128 = this.testData.code_128.slice(-6);
+    
+    // 產生隨機 QR Code
+    for (let i = 0; i < 2; i++) {
+      const qrValue = `https://test.com/qr/${Date.now()}-${i}`;
+      const card = await this.createQRCard(qrValue, '隨機 QR');
+      this.container.appendChild(card);
+      this.barcodes.push({ format: 'qr_code', value: qrValue, element: card });
     }
     
-    return this.generateAll(this.container);
+    // 產生隨機變體
+    await this.generateVariants();
+    
+    return this.barcodes;
   }
   
   /**

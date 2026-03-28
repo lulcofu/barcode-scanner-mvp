@@ -271,8 +271,8 @@ input[type="range"] {
 
 .test-barcodes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
 }
 
 .test-barcode-card {
@@ -282,11 +282,12 @@ input[type="range"] {
   text-align: center;
   cursor: pointer;
   transition: transform 0.3s, box-shadow 0.3s;
+  position: relative;
 }
 
 .test-barcode-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 5px 15px var(--shadow);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 8px 20px var(--shadow);
 }
 
 .test-barcode-card img,
@@ -303,6 +304,7 @@ input[type="range"] {
   padding: 3px 8px;
   border-radius: 4px;
   display: inline-block;
+  margin-bottom: 5px;
 }
 
 .test-barcode-card .value {
@@ -312,25 +314,52 @@ input[type="range"] {
   word-break: break-all;
 }
 
-/* 條碼方向和大小變體 */
-.test-barcode-card.rotated {
-  transform: rotate(5deg);
+/* 條碼大小變體 */
+.test-barcode-card.size-xs {
+  transform: scale(0.6);
 }
 
-.test-barcode-card.rotated:hover {
-  transform: rotate(5deg) translateY(-3px);
+.test-barcode-card.size-xs:hover {
+  transform: scale(0.65);
 }
 
-.test-barcode-card.small {
+.test-barcode-card.size-sm {
   transform: scale(0.8);
 }
 
-.test-barcode-card.small:hover {
-  transform: scale(0.8) translateY(-3px);
+.test-barcode-card.size-sm:hover {
+  transform: scale(0.85);
 }
 
-.test-barcode-card.large {
+.test-barcode-card.size-md {
+  /* 預設大小 */
+}
+
+.test-barcode-card.size-lg {
+  transform: scale(1.2);
+  grid-column: span 1;
+}
+
+.test-barcode-card.size-lg:hover {
+  transform: scale(1.25);
+}
+
+.test-barcode-card.size-xl {
+  transform: scale(1.5);
   grid-column: span 2;
+}
+
+.test-barcode-card.size-xl:hover {
+  transform: scale(1.55);
+}
+
+/* 條碼旋轉變體 */
+.test-barcode-card.rotated {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.test-barcode-card.rotated:hover {
+  z-index: 10;
 }
 
 /* 結果區域 */
