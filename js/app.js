@@ -163,41 +163,43 @@ class BarcodeScannerApp {
         { video: true }
       ];
 
+      let lastError = null;
       for (const constraints of constraintsList) {
         try {
           stream = await navigator.mediaDevices.getUserMedia(constraints);
           break;
         } catch (err) {
-          console.warn('[App] 相機參數不支援，嘗試降級:', err.message);
+          lastError = err;
+          console.warn('[App] 相機參數不支援，嘗試降級:', err.name, err.message);
         }
       }
 
       if (!stream) {
-        throw new Error('無法開啟相機，請確認已授予相機權限');
+        throw lastError || new Error('無法開啟相機');
       }
 
       this.stream = stream;
-      
+
       this.video.srcObject = this.stream;
       await this.video.play();
-      
+
       // 設定畫布
       this.overlay.width = this.video.videoWidth || 1920;
       this.overlay.height = this.video.videoHeight || 1080;
       this.overlayCtx = this.overlay.getContext('2d');
-      
+
       // 初始化掃描器
       await this.scanner.initialize(this.video);
       await this.scanner.startScanning();
-      
+
       this.stopBtn.disabled = false;
       this.startBtn.disabled = false;
-      
+
       console.log('[App] 相機已啟動');
-      
+
     } catch (e) {
       console.error('[App] 相機啟動失敗:', e);
-      this.handleError(e);
+      this.handleError(new Error(this.getCameraErrorMessage(e)));
       this.startBtn.disabled = false;
       this.scanIndicator.classList.remove('active');
     }
@@ -435,6 +437,43 @@ class BarcodeScannerApp {
     this.avgConfidenceElem.textContent = stats.avgConfidence;
   }
   
+  /**
+   * 根據錯誤類型產生相機錯誤訊息
+   */
+  getCameraErrorMessage(error) {
+    const name = error.name || '';
+
+    // 權限被拒或未授權
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      if (typeof window.isSecureContext !== 'undefined' && !window.isSecureContext) {
+        return '手機瀏覽器需要 HTTPS 才能授權相機。\n\n替代方案：\n• 使用 HTTPS 網址開啟\n• 使用下方「上傳圖片」掃描條碼';
+      }
+      return '相機權限被拒絕。\n\n請到 Chrome 設定 → 網站設定 → 相機，允許此網站使用相機後重新整理頁面。\n\n或使用下方「上傳圖片」掃描條碼。';
+    }
+
+    // 找不到相機
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+      return '找不到相機裝置。\n請確認裝置有相機，或使用「上傳圖片」功能。';
+    }
+
+    // 相機被佔用
+    if (name === 'NotReadableError' || name === 'TrackStartError') {
+      return '相機正被其他應用程式使用中。\n請關閉其他使用相機的 App 後重試。';
+    }
+
+    // 不支援的參數
+    if (name === 'OverconstrainedError') {
+      return '相機不支援所要求的設定。';
+    }
+
+    // TypeError 通常表示 API 不存在（非安全上下文）
+    if (name === 'TypeError' && !window.isSecureContext) {
+      return '此瀏覽器需要 HTTPS 連線才能使用相機。\n\n替代方案：\n• 使用 HTTPS 網址開啟\n• 使用下方「上傳圖片」掃描條碼';
+    }
+
+    return error.message || '無法開啟相機';
+  }
+
   /**
    * 處理錯誤
    */

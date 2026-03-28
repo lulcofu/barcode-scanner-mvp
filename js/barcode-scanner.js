@@ -72,7 +72,10 @@ class BarcodeScannerCore {
     
     // 初始化 ZXing
     try {
-      this.codeReader = new ZXing.BrowserMultiFormatReader();
+      const hints = new Map();
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, this.getAllowedFormats());
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      this.codeReader = new ZXing.BrowserMultiFormatReader(hints);
       console.log('[Scanner] ZXing-js 初始化成功');
     } catch (e) {
       console.error('[Scanner] ZXing-js 初始化失敗:', e);
@@ -343,26 +346,18 @@ class BarcodeScannerCore {
   async detectBarcodes(canvas) {
     try {
       const results = [];
-      
-      // 使用 ZXing-js 解碼
-      const hints = new Map();
-      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, this.getAllowedFormats());
-      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-      
-      // 從畫布取得影像資料
-      const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
-      
-      // 多次嘗試解碼（ZXing-js 一次只返回一個結果）
-      const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-      const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.GlobalHistogramBinarizer(luminanceSource));
-      
+
+      // 使用 ZXing-js 從 canvas 解碼
       try {
-        const decoded = this.codeReader.decode(binaryBitmap, hints);
+        const decoded = this.codeReader.decodeFromCanvas(canvas);
         if (decoded) {
           results.push(this.convertZXingResult(decoded, canvas));
         }
       } catch (e) {
-        // 沒找到條碼是正常的
+        // NotFoundException 沒找到條碼是正常的，其他錯誤記錄
+        if (e.name && e.name !== 'NotFoundException' && e.type !== 'NotFoundException') {
+          console.warn('[Scanner] ZXing 解碼錯誤:', e.name || e.type, e.message);
+        }
       }
       
       // 嘗試使用原生 API（如果支援）
@@ -552,6 +547,15 @@ class BarcodeScannerCore {
     Object.assign(this.config, newConfig);
     this.accumulator.config.minConfidence = this.config.minConfidence;
     this.accumulator.config.maxAge = this.config.maxAge;
+
+    // 更新 ZXing reader 的 hints
+    if (this.codeReader) {
+      const hints = new Map();
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, this.getAllowedFormats());
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+      this.codeReader.setHints(hints);
+    }
+
     console.log('[Scanner] 設定已更新:', newConfig);
   }
 }
