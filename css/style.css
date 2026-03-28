@@ -1,18 +1,52 @@
-/* 全域樣式 */
-:root {
-  --primary: #3498db;
-  --primary-dark: #2980b9;
-  --success: #27ae60;
-  --danger: #e74c3c;
-  --warning: #f39c12;
-  --bg: #1a1a2e;
-  --bg-card: #16213e;
-  --text: #eaeaea;
-  --text-muted: #95a5a6;
-  --border: #34495e;
-  --shadow: rgba(0, 0, 0, 0.3);
+/* ===== Theme: Ink Wash (水墨) ===== */
+[data-theme="ink-wash"] {
+  --primary: #8a8a8a;
+  --primary-dark: #6e6e6e;
+  --accent: #b0a090;
+  --success: #6b8f71;
+  --danger: #a05050;
+  --warning: #b89860;
+  --bg: #141414;
+  --bg-card: #1e1e1e;
+  --bg-input: #0e0e0e;
+  --text: #e8e0d8;
+  --text-muted: #7a7a7a;
+  --border: #333333;
+  --shadow: rgba(0, 0, 0, 0.5);
+  --card-alt-bg: #f5f0eb;
+  --card-alt-text: #1a1a1a;
+  --card-alt-muted: #666;
+  --card-alt-badge-bg: #e8e0d8;
+  --tab-active-border: #e8e0d8;
+  --gradient-start: #8a8a8a;
+  --gradient-end: #b0a090;
 }
 
+/* ===== Theme: Frozen Mist (冰霧) ===== */
+[data-theme="frozen-mist"] {
+  --primary: #5b8fa8;
+  --primary-dark: #4a7a92;
+  --accent: #8fb3c9;
+  --success: #5a9e6f;
+  --danger: #c0544f;
+  --warning: #c9a84c;
+  --bg: #e4ecf2;
+  --bg-card: #f2f6f9;
+  --bg-input: #dce6ee;
+  --text: #2c3e50;
+  --text-muted: #6b7f8e;
+  --border: #c0d0dc;
+  --shadow: rgba(44, 62, 80, 0.1);
+  --card-alt-bg: #ffffff;
+  --card-alt-text: #2c3e50;
+  --card-alt-muted: #6b7f8e;
+  --card-alt-badge-bg: #dce6ee;
+  --tab-active-border: #5b8fa8;
+  --gradient-start: #5b8fa8;
+  --gradient-end: #8fb3c9;
+}
+
+/* ===== Global ===== */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -25,6 +59,7 @@ body {
   color: var(--text);
   min-height: 100vh;
   line-height: 1.6;
+  transition: background 0.3s, color 0.3s;
 }
 
 .container {
@@ -33,16 +68,16 @@ body {
   padding: 20px;
 }
 
-/* 標題 */
+/* ===== Header ===== */
 header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 10px;
 }
 
 header h1 {
-  font-size: 2.5rem;
-  margin-bottom: 10px;
-  background: linear-gradient(135deg, var(--primary), #9b59b6);
+  font-size: 2.2rem;
+  margin-bottom: 6px;
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -50,73 +85,147 @@ header h1 {
 
 .subtitle {
   color: var(--text-muted);
-  font-size: 1.1rem;
+  font-size: 1rem;
 }
 
-/* 控制面板 */
+/* ===== Tab Bar ===== */
+.tab-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+  padding-bottom: 0;
+}
+
+.tab-buttons {
+  display: flex;
+  gap: 0;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--text-muted);
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: var(--text);
+}
+
+.tab-btn.active {
+  color: var(--text);
+  border-bottom-color: var(--tab-active-border);
+}
+
+.theme-toggle {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 3px;
+}
+
+.theme-toggle:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+/* ===== Tab Panes ===== */
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+/* ===== Control Panel ===== */
 .control-panel {
   background: var(--bg-card);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 16px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  border: 1px solid var(--border);
 }
 
 .control-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
-.control-group label {
+.control-group > label {
   font-weight: 600;
-  color: var(--primary);
+  color: var(--accent);
+  font-size: 0.9rem;
 }
 
 .checkbox-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .checkbox-group label {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   font-weight: normal;
   color: var(--text);
   cursor: pointer;
+  font-size: 0.9rem;
 }
 
 input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
+  accent-color: var(--primary);
 }
 
 input[type="text"], input[type="number"], select {
-  background: var(--bg);
+  background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 10px;
+  padding: 8px 10px;
   color: var(--text);
-  font-size: 1rem;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+input[type="text"]:focus, select:focus {
+  outline: none;
+  border-color: var(--primary);
 }
 
 input[type="range"] {
   width: 100%;
-  height: 8px;
+  height: 6px;
   cursor: pointer;
+  accent-color: var(--primary);
 }
 
-/* 視訊區域 */
+/* ===== Video ===== */
 .video-container {
   background: var(--bg-card);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
 }
 
 .video-wrapper {
@@ -147,14 +256,14 @@ input[type="range"] {
   position: absolute;
   top: 10px;
   right: 10px;
-  background: rgba(52, 152, 219, 0.9);
+  background: rgba(0, 0, 0, 0.6);
   color: white;
-  padding: 8px 15px;
+  padding: 6px 14px;
   border-radius: 20px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   display: none;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .scan-indicator.active {
@@ -162,8 +271,8 @@ input[type="range"] {
 }
 
 .spinner {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border: 2px solid white;
   border-top-color: transparent;
   border-radius: 50%;
@@ -174,34 +283,30 @@ input[type="range"] {
   to { transform: rotate(360deg); }
 }
 
-/* 按鈕 */
+/* ===== Buttons ===== */
 .button-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 15px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
+  gap: 6px;
+  padding: 10px 20px;
   border: none;
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s;
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
-}
-
-.btn .icon {
-  font-size: 1.2rem;
 }
 
 .btn.primary {
@@ -219,7 +324,8 @@ input[type="range"] {
 }
 
 .btn.secondary:hover:not(:disabled) {
-  background: #4a6278;
+  background: var(--text-muted);
+  color: var(--bg);
 }
 
 .btn.danger {
@@ -228,235 +334,137 @@ input[type="range"] {
 }
 
 .btn.danger:hover:not(:disabled) {
-  background: #c0392b;
-}
-
-.btn.success {
-  background: var(--success);
-  color: white;
-}
-
-.btn.success:hover:not(:disabled) {
-  background: #219a52;
+  opacity: 0.85;
 }
 
 .btn.small {
-  padding: 6px 12px;
-  font-size: 0.85rem;
-}
-
-/* 測試條碼區域 */
-.test-section {
-  background: var(--bg-card);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-}
-
-.test-section h2 {
-  margin-bottom: 10px;
-  color: var(--primary);
-}
-
-.test-section > p {
-  color: var(--text-muted);
-  margin-bottom: 15px;
-}
-
-.test-controls {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.test-barcodes-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 20px;
-}
-
-.test-barcode-card {
-  background: white;
-  border-radius: 8px;
-  padding: 15px;
-  text-align: center;
-  cursor: pointer;
-  transition: transform 0.3s, box-shadow 0.3s;
-  position: relative;
-}
-
-.test-barcode-card:hover {
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 8px 20px var(--shadow);
-}
-
-.test-barcode-card img,
-.test-barcode-card canvas {
-  max-width: 100%;
-  height: auto;
-  margin-bottom: 10px;
-}
-
-.test-barcode-card .format {
+  padding: 5px 12px;
   font-size: 0.8rem;
-  color: #666;
-  background: #f0f0f0;
-  padding: 3px 8px;
-  border-radius: 4px;
-  display: inline-block;
-  margin-bottom: 5px;
 }
 
-.test-barcode-card .value {
-  font-family: monospace;
-  font-size: 0.85rem;
-  color: #333;
-  word-break: break-all;
+/* ===== Stats ===== */
+.stats-section {
+  margin-bottom: 16px;
 }
 
-/* 條碼大小變體 */
-.test-barcode-card.size-xs {
-  transform: scale(0.6);
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
 }
 
-.test-barcode-card.size-xs:hover {
-  transform: scale(0.65);
-}
-
-.test-barcode-card.size-sm {
-  transform: scale(0.8);
-}
-
-.test-barcode-card.size-sm:hover {
-  transform: scale(0.85);
-}
-
-.test-barcode-card.size-md {
-  /* 預設大小 */
-}
-
-.test-barcode-card.size-lg {
-  transform: scale(1.2);
-  grid-column: span 1;
-}
-
-.test-barcode-card.size-lg:hover {
-  transform: scale(1.25);
-}
-
-.test-barcode-card.size-xl {
-  transform: scale(1.5);
-  grid-column: span 2;
-}
-
-.test-barcode-card.size-xl:hover {
-  transform: scale(1.55);
-}
-
-/* 條碼旋轉變體 */
-.test-barcode-card.rotated {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.test-barcode-card.rotated:hover {
-  z-index: 10;
-}
-
-/* 結果區域 */
-.results-section {
+.stat-card {
   background: var(--bg-card);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
 }
 
-.results-section h2 {
-  margin-bottom: 15px;
-  color: var(--primary);
+.stat-value {
+  display: block;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ===== Results ===== */
+.results-section, .filter-section {
+  background: var(--bg-card);
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+}
+
+.results-section h2, .filter-section h2,
+.test-section h2, .comparison-section h2 {
+  margin-bottom: 12px;
+  color: var(--accent);
+  font-size: 1.15rem;
 }
 
 .results-info {
   display: flex;
   gap: 20px;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   color: var(--text-muted);
+  font-size: 0.9rem;
 }
 
 .results-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 15px;
-  max-height: 500px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  max-height: 400px;
   overflow-y: auto;
 }
 
 .result-card {
   background: var(--bg);
   border-radius: 8px;
-  padding: 15px;
+  padding: 12px;
   border-left: 4px solid var(--primary);
   animation: fadeIn 0.3s ease;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.result-card.ean_13 { border-left-color: #27ae60; }
-.result-card.ean_8 { border-left-color: #3498db; }
-.result-card.code_128 { border-left-color: #9b59b6; }
-.result-card.code_39 { border-left-color: #e67e22; }
-.result-card.qr_code { border-left-color: #1abc9c; }
-.result-card.data_matrix { border-left-color: #e74c3c; }
-.result-card.pdf_417 { border-left-color: #f1c40f; }
-.result-card.itf { border-left-color: #95a5a6; }
+.result-card.ean_13 { border-left-color: var(--success); }
+.result-card.ean_8 { border-left-color: #5b8fa8; }
+.result-card.code_128 { border-left-color: #9b7ab8; }
+.result-card.code_39 { border-left-color: #c08040; }
+.result-card.qr_code { border-left-color: #4ab0a0; }
+.result-card.data_matrix { border-left-color: var(--danger); }
+.result-card.pdf_417 { border-left-color: var(--warning); }
+.result-card.itf { border-left-color: var(--text-muted); }
 
 .result-card .format-badge {
   display: inline-block;
-  padding: 3px 10px;
+  padding: 2px 8px;
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  background: var(--border);
+  color: var(--text);
 }
-
-.result-card.ean_13 .format-badge { background: #27ae60; }
-.result-card.ean_8 .format-badge { background: #3498db; }
-.result-card.code_128 .format-badge { background: #9b59b6; }
-.result-card.code_39 .format-badge { background: #e67e22; }
-.result-card.qr_code .format-badge { background: #1abc9c; }
-.result-card.data_matrix .format-badge { background: #e74c3c; }
-.result-card.pdf_417 .format-badge { background: #f1c40f; }
-.result-card.itf .format-badge { background: #95a5a6; }
 
 .result-card .barcode-value {
   font-family: 'Courier New', monospace;
-  font-size: 1rem;
+  font-size: 0.95rem;
   word-break: break-all;
   color: var(--text);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .result-card .meta {
   display: flex;
   justify-content: space-between;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
 .result-card .confidence {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 
 .confidence-bar {
-  width: 50px;
-  height: 6px;
+  width: 40px;
+  height: 4px;
   background: var(--border);
-  border-radius: 3px;
+  border-radius: 2px;
   overflow: hidden;
 }
 
@@ -468,104 +476,48 @@ input[type="range"] {
 
 .empty-state {
   text-align: center;
-  padding: 40px;
+  padding: 30px;
   color: var(--text-muted);
-}
-
-.empty-state .icon {
-  font-size: 3rem;
-  display: block;
-  margin-bottom: 15px;
 }
 
 .empty-state .hint {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-}
-
-/* 統計區域 */
-.stats-section {
-  background: var(--bg-card);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-}
-
-.stats-section h2 {
-  margin-bottom: 15px;
-  color: var(--primary);
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 15px;
-}
-
-.stat-card {
-  background: var(--bg);
-  border-radius: 8px;
-  padding: 15px;
-  text-align: center;
-}
-
-.stat-value {
-  display: block;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--primary);
-}
-
-.stat-label {
   font-size: 0.85rem;
-  color: var(--text-muted);
 }
 
-/* 過濾區域 */
-.filter-section {
-  background: var(--bg-card);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-}
-
-.filter-section h2 {
-  margin-bottom: 15px;
-  color: var(--primary);
-}
-
+/* ===== Filter ===== */
 .filter-group {
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .filter-group > label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: var(--text);
   font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .filter-group input[type="text"] {
   width: calc(100% - 100px);
-  margin-right: 10px;
+  margin-right: 8px;
 }
 
 .active-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 .filter-tag {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   background: var(--primary);
   color: white;
-  padding: 5px 10px;
-  border-radius: 15px;
-  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
 }
 
 .filter-tag button {
@@ -577,86 +529,247 @@ input[type="range"] {
   padding: 0;
 }
 
-/* 頁尾 */
-footer {
-  text-align: center;
-  padding: 20px;
+/* ===== Test Section ===== */
+.test-section {
+  background: var(--bg-card);
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+}
+
+.test-section > p {
   color: var(--text-muted);
-  border-top: 1px solid var(--border);
-  margin-top: 20px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
 }
 
-/* 響應式設計 */
-@media (max-width: 768px) {
-  header h1 {
-    font-size: 1.8rem;
-  }
-  
-  .control-panel {
-    grid-template-columns: 1fr;
-  }
-  
-  .test-barcodes-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  }
-  
-  .test-barcode-card.large {
-    grid-column: span 1;
-  }
-  
-  .results-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.test-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
-/* 列印樣式 */
-@media print {
-  body {
-    background: white;
-    color: black;
-  }
-  
-  .test-section {
-    background: white;
-    page-break-inside: avoid;
-  }
-  
-  .test-barcode-card {
-    background: white;
-    border: 1px solid #ccc;
-  }
-  
-  .test-controls,
-  .control-panel,
-  .video-container,
-  .results-section,
-  .stats-section,
-  .filter-section,
-  .button-group,
-  footer {
-    display: none !important;
-  }
+.test-barcodes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 16px;
 }
 
-/* 滾動條樣式 */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+.test-barcode-card {
+  background: var(--card-alt-bg);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
 }
 
-::-webkit-scrollbar-track {
+.test-barcode-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px var(--shadow);
+}
+
+.test-barcode-card img,
+.test-barcode-card canvas {
+  max-width: 100%;
+  height: auto;
+  margin-bottom: 8px;
+}
+
+.test-barcode-card .format {
+  font-size: 0.75rem;
+  color: var(--card-alt-muted);
+  background: var(--card-alt-badge-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-bottom: 4px;
+}
+
+.test-barcode-card .value {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--card-alt-text);
+  word-break: break-all;
+}
+
+/* Size variants */
+.test-barcode-card.size-xs { transform: scale(0.6); }
+.test-barcode-card.size-xs:hover { transform: scale(0.65); }
+.test-barcode-card.size-sm { transform: scale(0.8); }
+.test-barcode-card.size-sm:hover { transform: scale(0.85); }
+.test-barcode-card.size-lg { transform: scale(1.2); }
+.test-barcode-card.size-lg:hover { transform: scale(1.25); }
+.test-barcode-card.size-xl { transform: scale(1.4); grid-column: span 2; }
+.test-barcode-card.size-xl:hover { transform: scale(1.45); }
+.test-barcode-card.rotated { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.test-barcode-card.rotated:hover { z-index: 10; }
+
+/* ===== Comparison Section ===== */
+.comparison-section {
+  background: var(--bg-card);
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+}
+
+.comparison-section > .hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+.comparison-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.comparison-panel h3 {
+  font-size: 0.95rem;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.comparison-panel textarea {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  color: var(--text);
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.comparison-panel textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.comparison-panel textarea[readonly] {
+  opacity: 0.8;
+}
+
+.recognized-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.comparison-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* Comparison Results */
+.comparison-results {
+  border-radius: 8px;
+}
+
+.comparison-summary {
   background: var(--bg);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  text-align: center;
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--border);
+.comparison-summary .rate {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.comparison-summary .rate-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.comparison-group {
+  margin-bottom: 12px;
+}
+
+.comparison-group h4 {
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  padding: 6px 10px;
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--primary);
+.comparison-group h4.matched {
+  background: var(--success);
+  color: white;
 }
+
+.comparison-group h4.missing {
+  background: var(--danger);
+  color: white;
+}
+
+.comparison-group h4.extra {
+  background: var(--warning);
+  color: white;
+}
+
+.comparison-group ul {
+  list-style: none;
+  padding: 0;
+}
+
+.comparison-group li {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.comparison-group li:last-child {
+  border-bottom: none;
+}
+
+/* ===== Footer ===== */
+footer {
+  text-align: center;
+  padding: 16px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+  font-size: 0.85rem;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  header h1 { font-size: 1.6rem; }
+  .control-panel { grid-template-columns: 1fr; }
+  .test-barcodes-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .results-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .comparison-columns { grid-template-columns: 1fr; }
+  .tab-btn { padding: 10px 16px; font-size: 0.9rem; }
+}
+
+/* ===== Print ===== */
+@media print {
+  body { background: white; color: black; }
+  .test-section { background: white; page-break-inside: avoid; }
+  .test-barcode-card { background: white; border: 1px solid #ccc; }
+  .tab-bar, .control-panel, .video-container, .results-section,
+  .stats-section, .filter-section, .comparison-section,
+  .button-group, footer { display: none !important; }
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }

@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" data-theme="ink-wash">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>多條碼掃描器 MVP</title>
   <link rel="stylesheet" href="css/style.css">
-  <!-- getUserMedia polyfill（需在其他腳本之前載入） -->
+  <!-- getUserMedia polyfill -->
   <script>
     if (navigator.mediaDevices === undefined) navigator.mediaDevices = {};
     if (navigator.mediaDevices.getUserMedia === undefined) {
@@ -23,169 +23,180 @@
 <body>
   <div class="container">
     <header>
-      <h1>🔬 多條碼掃描器</h1>
+      <h1>多條碼掃描器</h1>
       <p class="subtitle">支援 1D/2D 條碼 | 多尺度掃描 | 即時過濾</p>
     </header>
 
-    <!-- HTTPS 警告 -->
-    <div id="httpsWarning" class="warning-banner" style="display: none;">
-      <strong>⚠️ 相機功能需要 HTTPS</strong>
-      <p>手機瀏覽器需要 HTTPS 連線才能使用相機。請改用以下方式：</p>
-      <ul>
-        <li>使用 HTTPS 網址存取</li>
-        <li>或使用「上傳圖片」功能掃描條碼</li>
-      </ul>
-    </div>
+    <!-- Tab Bar -->
+    <nav class="tab-bar">
+      <div class="tab-buttons">
+        <button class="tab-btn active" data-tab="scanner">掃描器</button>
+        <button class="tab-btn" data-tab="test">測試條碼</button>
+      </div>
+      <button class="theme-toggle" id="themeToggle" title="切換主題">
+        <span id="themeIcon">水墨</span>
+      </button>
+    </nav>
 
-    <!-- 控制面板 -->
-    <div class="control-panel">
-      <div class="control-group">
-        <label>掃描模式：</label>
-        <select id="scanMode">
-          <option value="pyramid">金字塔掃描（推薦）</option>
-          <option value="single">單次全圖掃描</option>
-          <option value="roi">ROI 區域定位</option>
-        </select>
-      </div>
-      
-      <div class="control-group">
-        <label>最小信心度：</label>
-        <input type="range" id="minConfidence" min="1" max="10" value="3">
-        <span id="confidenceValue">3</span>
-      </div>
-      
-      <div class="control-group">
-        <label>條碼類型：</label>
-        <div class="checkbox-group">
-          <label><input type="checkbox" value="ean_13" checked> EAN-13</label>
-          <label><input type="checkbox" value="ean_8" checked> EAN-8</label>
-          <label><input type="checkbox" value="code_128" checked> Code-128</label>
-          <label><input type="checkbox" value="code_39" checked> Code-39</label>
-          <label><input type="checkbox" value="qr_code" checked> QR Code</label>
-          <label><input type="checkbox" value="data_matrix" checked> Data Matrix</label>
-          <label><input type="checkbox" value="pdf_417" checked> PDF-417</label>
-          <label><input type="checkbox" value="itf" checked> ITF</label>
-        </div>
-      </div>
-      
-      <div class="control-group">
-        <label>金字塔尺度：</label>
-        <input type="text" id="pyramidScales" value="1.0,0.6,0.35" placeholder="1.0,0.6,0.35">
-      </div>
-    </div>
+    <!-- ===== Tab: 掃描器 ===== -->
+    <div class="tab-pane active" data-tab-pane="scanner">
 
-    <!-- 視訊區域 -->
-    <div class="video-container">
-      <div class="video-wrapper">
-        <video id="video" autoplay playsinline></video>
-        <canvas id="overlay"></canvas>
-        <div class="scan-indicator" id="scanIndicator">
-          <span class="spinner"></span>
-          掃描中...
+      <!-- 控制面板 -->
+      <div class="control-panel">
+        <div class="control-group">
+          <label>掃描模式：</label>
+          <select id="scanMode">
+            <option value="pyramid">金字塔掃描（推薦）</option>
+            <option value="single">單次全圖掃描</option>
+            <option value="roi">ROI 區域定位</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>最小信心度：</label>
+          <input type="range" id="minConfidence" min="1" max="10" value="3">
+          <span id="confidenceValue">3</span>
+        </div>
+        <div class="control-group">
+          <label>條碼類型：</label>
+          <div class="checkbox-group">
+            <label><input type="checkbox" value="ean_13" checked> EAN-13</label>
+            <label><input type="checkbox" value="ean_8" checked> EAN-8</label>
+            <label><input type="checkbox" value="code_128" checked> Code-128</label>
+            <label><input type="checkbox" value="code_39" checked> Code-39</label>
+            <label><input type="checkbox" value="qr_code" checked> QR Code</label>
+            <label><input type="checkbox" value="data_matrix" checked> Data Matrix</label>
+            <label><input type="checkbox" value="pdf_417" checked> PDF-417</label>
+            <label><input type="checkbox" value="itf" checked> ITF</label>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>金字塔尺度：</label>
+          <input type="text" id="pyramidScales" value="1.0,0.6,0.35" placeholder="1.0,0.6,0.35">
         </div>
       </div>
-      
-      <div class="button-group">
-        <button id="startBtn" class="btn primary">
-          <span class="icon">📷</span> 開啟相機
-        </button>
-        <button id="stopBtn" class="btn danger" disabled>
-          <span class="icon">⏹️</span> 停止掃描
-        </button>
-        <button id="clearBtn" class="btn secondary">
-          <span class="icon">🗑️</span> 清除結果
-        </button>
-        <button id="uploadBtn" class="btn secondary">
-          <span class="icon">📁</span> 上傳圖片
-        </button>
-        <input type="file" id="fileInput" accept="image/*" hidden>
-      </div>
-    </div>
 
-    <!-- 測試條碼區域 -->
-    <div class="test-section">
-      <h2>🧪 測試用條碼</h2>
-      <p>點擊條碼可放大查看，用於測試掃描功能</p>
-      
-      <div class="test-controls">
-        <button id="generateTestBtn" class="btn secondary">
-          <span class="icon">🔄</span> 重新產生測試條碼
-        </button>
-        <button id="printTestBtn" class="btn secondary">
-          <span class="icon">🖨️</span> 列印測試頁
-        </button>
+      <!-- 視訊區域 -->
+      <div class="video-container">
+        <div class="video-wrapper">
+          <video id="video" autoplay playsinline></video>
+          <canvas id="overlay"></canvas>
+          <div class="scan-indicator" id="scanIndicator">
+            <span class="spinner"></span>
+            掃描中...
+          </div>
+        </div>
+        <div class="button-group">
+          <button id="startBtn" class="btn primary">開啟相機</button>
+          <button id="stopBtn" class="btn danger" disabled>停止掃描</button>
+          <button id="clearBtn" class="btn secondary">清除結果</button>
+          <button id="uploadBtn" class="btn secondary">上傳圖片</button>
+          <input type="file" id="fileInput" accept="image/*" hidden>
+        </div>
       </div>
-      
-      <div id="testBarcodes" class="test-barcodes-grid">
-        <!-- 動態產生 -->
-      </div>
-    </div>
 
-    <!-- 結果區域 -->
-    <div class="results-section">
-      <h2>📊 掃描結果</h2>
-      <div class="results-info">
-        <span id="totalScanned">已掃描: 0 個條碼</span>
-        <span id="stableCount">穩定結果: 0 個</span>
-      </div>
-      <div id="results" class="results-grid">
-        <div class="empty-state">
-          <span class="icon">📭</span>
-          <p>尚無掃描結果</p>
-          <p class="hint">請開啟相機或上傳圖片開始掃描</p>
+      <!-- 統計區域 -->
+      <div class="stats-section">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-value" id="fpsValue">0</span>
+            <span class="stat-label">FPS</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="frameCount">0</span>
+            <span class="stat-label">已處理幀數</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="uniqueBarcodes">0</span>
+            <span class="stat-label">唯一條碼</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="avgConfidence">0</span>
+            <span class="stat-label">平均信心度</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- 統計區域 -->
-    <div class="stats-section">
-      <h2>📈 即時統計</h2>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <span class="stat-value" id="fpsValue">0</span>
-          <span class="stat-label">FPS</span>
+      <!-- 結果區域 -->
+      <div class="results-section">
+        <h2>掃描結果</h2>
+        <div class="results-info">
+          <span id="totalScanned">已掃描: 0 個條碼</span>
+          <span id="stableCount">穩定結果: 0 個</span>
         </div>
-        <div class="stat-card">
-          <span class="stat-value" id="frameCount">0</span>
-          <span class="stat-label">已處理幀數</span>
+        <div id="results" class="results-grid">
+          <div class="empty-state">
+            <p>尚無掃描結果</p>
+            <p class="hint">請開啟相機或上傳圖片開始掃描</p>
+          </div>
         </div>
-        <div class="stat-card">
-          <span class="stat-value" id="uniqueBarcodes">0</span>
-          <span class="stat-label">唯一條碼</span>
+      </div>
+
+      <!-- 過濾設定 -->
+      <div class="filter-section">
+        <h2>過濾設定</h2>
+        <div class="filter-group">
+          <label>格式驗證：</label>
+          <div class="checkbox-group">
+            <label><input type="checkbox" id="validateEAN" checked> EAN 檢查碼驗證</label>
+            <label><input type="checkbox" id="validateCode128" checked> Code-128 最小長度</label>
+            <label><input type="checkbox" id="filterDuplicates" checked> 過濾重複</label>
+          </div>
         </div>
-        <div class="stat-card">
-          <span class="stat-value" id="avgConfidence">0</span>
-          <span class="stat-label">平均信心度</span>
+        <div class="filter-group">
+          <label>內容過濾（正則表達式）：</label>
+          <input type="text" id="contentFilter" placeholder="例: ^[0-9]{13}$ (EAN-13 格式)">
+          <button id="addFilterBtn" class="btn small">新增過濾</button>
         </div>
+        <div id="activeFilters" class="active-filters"></div>
       </div>
     </div>
 
-    <!-- 過濾設定 -->
-    <div class="filter-section">
-      <h2>🔧 過濾設定</h2>
-      <div class="filter-group">
-        <label>格式驗證：</label>
-        <div class="checkbox-group">
-          <label><input type="checkbox" id="validateEAN" checked> EAN 檢查碼驗證</label>
-          <label><input type="checkbox" id="validateCode128" checked> Code-128 最小長度</label>
-          <label><input type="checkbox" id="filterDuplicates" checked> 過濾重複</label>
+    <!-- ===== Tab: 測試條碼 ===== -->
+    <div class="tab-pane" data-tab-pane="test">
+
+      <!-- 測試條碼產生器 -->
+      <div class="test-section">
+        <h2>測試用條碼</h2>
+        <p>點擊條碼可放大查看，用於測試掃描功能</p>
+        <div class="test-controls">
+          <button id="generateTestBtn" class="btn secondary">重新產生測試條碼</button>
+          <button id="printTestBtn" class="btn secondary">列印測試頁</button>
         </div>
+        <div id="testBarcodes" class="test-barcodes-grid"></div>
       </div>
-      
-      <div class="filter-group">
-        <label>內容過濾（正則表達式）：</label>
-        <input type="text" id="contentFilter" placeholder="例: ^[0-9]{13}$ (EAN-13 格式)">
-        <button id="addFilterBtn" class="btn small">新增過濾</button>
-      </div>
-      
-      <div id="activeFilters" class="active-filters">
-        <!-- 動態產生 -->
+
+      <!-- 比對工具 -->
+      <div class="comparison-section">
+        <h2>辨識率比對</h2>
+        <p class="hint">A 電腦開啟本頁輸入預期條碼，手機掃描後將已辨識列表貼入比對</p>
+
+        <div class="comparison-columns">
+          <div class="comparison-panel">
+            <h3>預期條碼（每行一個）</h3>
+            <textarea id="expectedBarcodes" rows="8" placeholder="每行輸入一個條碼字串&#10;例如：&#10;4711234567890&#10;9780201379624&#10;CODE-128-TEST-001"></textarea>
+          </div>
+          <div class="comparison-panel">
+            <h3>已辨識條碼</h3>
+            <textarea id="recognizedBarcodes" rows="8" placeholder="從掃描器複製已辨識的條碼列表貼入此處" readonly></textarea>
+            <div class="recognized-actions">
+              <button id="copyRecognizedBtn" class="btn small">複製列表</button>
+              <button id="clearRecognizedBtn" class="btn small">清除</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="comparison-actions">
+          <button id="compareBtn" class="btn primary">開始比對</button>
+          <button id="clearCompareBtn" class="btn secondary">清除比對結果</button>
+        </div>
+
+        <div id="comparisonResults" class="comparison-results"></div>
       </div>
     </div>
   </div>
 
   <footer>
-    <p>條碼掃描器 MVP v1.0 | 使用 ZXing-js | 🔬 Mantle</p>
+    <p>條碼掃描器 MVP v1.0 | ZXing-js</p>
   </footer>
 
   <script src="js/barcode-scanner.js"></script>
