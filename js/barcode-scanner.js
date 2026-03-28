@@ -70,12 +70,9 @@ class BarcodeScannerCore {
   async initialize(videoElement) {
     this.videoElement = videoElement;
     
-    // 初始化 ZXing
+    // 初始化 ZXing（不在 ZXing 層限制格式，由 BarcodeDataFilter 過濾）
     try {
-      const hints = new Map();
-      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, this.getAllowedFormats());
-      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-      this.codeReader = new ZXing.BrowserMultiFormatReader(hints);
+      this.codeReader = new ZXing.BrowserMultiFormatReader();
       console.log('[Scanner] ZXing-js 初始化成功');
     } catch (e) {
       console.error('[Scanner] ZXing-js 初始化失敗:', e);
@@ -411,45 +408,34 @@ class BarcodeScannerCore {
   }
   
   /**
-   * 正規化格式名稱
+   * 正規化格式名稱（支援 ZXing 數字列舉和字串）
    */
   normalizeFormat(format) {
-    const formatMap = {
-      'EAN_13': 'ean_13',
-      'EAN_8': 'ean_8',
-      'CODE_128': 'code_128',
-      'CODE_39': 'code_39',
-      'QR_CODE': 'qr_code',
-      'DATA_MATRIX': 'data_matrix',
-      'PDF_417': 'pdf_417',
-      'ITF': 'itf',
-      'UPC_A': 'upc_a',
-      'UPC_E': 'upc_e',
-      'CODE_93': 'code_93',
-      'CODABAR': 'codabar',
-      'MAXICODE': 'maxicode',
-      'RSS_14': 'rss_14',
+    // ZXing BarcodeFormat 數字列舉對應
+    const numericMap = {
+      0: 'aztec', 1: 'codabar', 2: 'code_39', 3: 'code_93',
+      4: 'code_128', 5: 'data_matrix', 6: 'ean_8', 7: 'ean_13',
+      8: 'itf', 9: 'maxicode', 10: 'pdf_417', 11: 'qr_code',
+      12: 'rss_14', 13: 'rss_expanded', 14: 'upc_a', 15: 'upc_e'
+    };
+
+    if (typeof format === 'number') {
+      return numericMap[format] || ('unknown_' + format);
+    }
+
+    const stringMap = {
+      'EAN_13': 'ean_13', 'EAN_8': 'ean_8',
+      'CODE_128': 'code_128', 'CODE_39': 'code_39',
+      'QR_CODE': 'qr_code', 'DATA_MATRIX': 'data_matrix',
+      'PDF_417': 'pdf_417', 'ITF': 'itf',
+      'UPC_A': 'upc_a', 'UPC_E': 'upc_e',
+      'CODE_93': 'code_93', 'CODABAR': 'codabar',
+      'MAXICODE': 'maxicode', 'RSS_14': 'rss_14',
       'RSS_EXPANDED': 'rss_expanded'
     };
-    
+
     const str = String(format).toUpperCase();
-    return formatMap[str] || format.toLowerCase();
-  }
-  
-  /**
-   * 取得允許的格式清單
-   */
-  getAllowedFormats() {
-    const formats = [];
-    
-    for (const format of this.config.allowedFormats) {
-      const zxingFormat = ZXing.BarcodeFormat[format.toUpperCase()];
-      if (zxingFormat !== undefined) {
-        formats.push(zxingFormat);
-      }
-    }
-    
-    return formats;
+    return stringMap[str] || str.toLowerCase();
   }
   
   /**
@@ -458,9 +444,9 @@ class BarcodeScannerCore {
   extractBoundingBox(result, canvas) {
     try {
       const points = result.getResultPoints();
-      if (points && points.length >= 4) {
-        const xs = points.map(p => p.getX());
-        const ys = points.map(p => p.getY());
+      if (points && points.length >= 2) {
+        const xs = points.map(p => (typeof p.getX === 'function') ? p.getX() : p.x);
+        const ys = points.map(p => (typeof p.getY === 'function') ? p.getY() : p.y);
         
         const minX = Math.min(...xs);
         const maxX = Math.max(...xs);
@@ -547,14 +533,6 @@ class BarcodeScannerCore {
     Object.assign(this.config, newConfig);
     this.accumulator.config.minConfidence = this.config.minConfidence;
     this.accumulator.config.maxAge = this.config.maxAge;
-
-    // 更新 ZXing reader 的 hints
-    if (this.codeReader) {
-      const hints = new Map();
-      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, this.getAllowedFormats());
-      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-      this.codeReader.setHints(hints);
-    }
 
     console.log('[Scanner] 設定已更新:', newConfig);
   }
