@@ -8,7 +8,7 @@ class TestBarcodeGenerator {
     this.container = null;
     this.barcodes = [];
     
-    // 預設測試資料
+    // 預設測試資料（所有明文 ≤ 20 字元）
     this.testData = {
       ean_13: [
         { value: '4711234567890', name: '台灣商品' },
@@ -21,8 +21,8 @@ class TestBarcodeGenerator {
         { value: '96385074', name: '小型商品 B' }
       ],
       code_128: [
-        { value: 'CODE-128-TEST-001', name: '物流編號 A' },
-        { value: 'SN-20260328-00001', name: '序號條碼' },
+        { value: 'CODE128-TEST-001', name: '物流編號 A' },
+        { value: 'SN-20260328-0001', name: '序號條碼' },
         { value: 'PROD-ABC-12345', name: '產品編號' }
       ],
       code_39: [
@@ -30,9 +30,13 @@ class TestBarcodeGenerator {
         { value: 'ABC-123', name: '資產編號' }
       ],
       qr_code: [
-        { value: 'https://example.com/product/123', name: '產品連結' },
-        { value: '產品:A-001\n數量:100\n日期:2026-03-28', name: '產品資訊' },
-        { value: 'WIFI:T:WPA;S:TestNetwork;P:password123;;', name: 'WiFi 設定' }
+        { value: 'QR-PROD-001', name: '產品編碼' },
+        { value: 'QR-INV-A001-0328', name: '庫存資訊' },
+        { value: 'QR-WIFI-TEST-01', name: 'WiFi 設定' }
+      ],
+      data_matrix: [
+        { value: 'DM-ASSET-00001', name: '資產標籤' },
+        { value: 'DM-LOT-20260331', name: '批次標籤' }
       ],
       itf: [
         { value: '123456789012', name: '包裝箱條碼' },
@@ -90,12 +94,34 @@ class TestBarcodeGenerator {
   }
   
   /**
+   * 載入 bwip-js（Data Matrix 產生器）
+   */
+  async loadBwipJs() {
+    if (window.bwipjs) return true;
+
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/bwip-js@3.4.6/dist/bwip-js-min.js';
+      script.onload = () => {
+        console.log('[Generator] bwip-js 載入成功');
+        resolve(true);
+      };
+      script.onerror = () => {
+        console.warn('[Generator] bwip-js 載入失敗，Data Matrix 將不可用');
+        resolve(false);
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  /**
    * 初始化
    */
   async initialize() {
     try {
       await this.loadJsBarcode();
       await this.loadQRCode();
+      await this.loadBwipJs();
       console.log('[Generator] 初始化完成');
       return true;
     } catch (e) {
@@ -147,6 +173,17 @@ class TestBarcodeGenerator {
       const card = await this.createQRCard(item.value, item.name);
       this.container.appendChild(card);
       this.barcodes.push({ format: 'qr_code', value: item.value, element: card });
+    }
+
+    // Data Matrix
+    if (window.bwipjs) {
+      const dmData = this.testData.data_matrix;
+      for (let i = 0; i < Math.min(2, dmData.length); i++) {
+        const item = dmData[i];
+        const card = await this.createDataMatrixCard(item.value, item.name);
+        this.container.appendChild(card);
+        this.barcodes.push({ format: 'data_matrix', value: item.value, element: card });
+      }
     }
   }
   
@@ -207,17 +244,32 @@ class TestBarcodeGenerator {
       });
     }
     
-    // QR Code 變體（不同大小）
+    // QR Code 變體（不同大小，值 ≤ 20 字元）
     const qrVariants = [
-      { size: 'sm', value: 'https://test.com/qr/001' },
-      { size: 'lg', value: 'QR-TEST-' + Date.now() },
+      { size: 'sm', value: 'QR-SM-' + Date.now().toString(36) },
+      { size: 'lg', value: 'QR-LG-' + Date.now().toString(36) },
     ];
-    
+
     for (const v of qrVariants) {
-      const card = await this.createQRCard(v.value, `QR ${v.size}`, { size: v.size });
+      const val = v.value.substring(0, 20);
+      const card = await this.createQRCard(val, `QR ${v.size}`, { size: v.size });
       card.classList.add(`size-${v.size}`);
       this.container.appendChild(card);
-      this.barcodes.push({ format: 'qr_code', value: v.value, element: card, variant: v.size });
+      this.barcodes.push({ format: 'qr_code', value: val, element: card, variant: v.size });
+    }
+
+    // Data Matrix 變體
+    if (window.bwipjs) {
+      const dmVariants = [
+        { size: 'sm', value: this.getRandomValue('data_matrix') },
+        { size: 'md', value: this.getRandomValue('data_matrix') },
+      ];
+      for (const v of dmVariants) {
+        const card = await this.createDataMatrixCard(v.value, `DM ${v.size}`, { size: v.size });
+        card.classList.add(`size-${v.size}`);
+        this.container.appendChild(card);
+        this.barcodes.push({ format: 'data_matrix', value: v.value, element: card, variant: v.size });
+      }
     }
   }
   
@@ -236,6 +288,8 @@ class TestBarcodeGenerator {
         return this.generateRandomCode39();
       case 'itf':
         return this.generateRandomITF();
+      case 'data_matrix':
+        return this.generateRandomDataMatrix();
       default:
         return this.generateRandomCode128();
     }
@@ -281,7 +335,9 @@ class TestBarcodeGenerator {
     const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = prefix + '-';
-    for (let i = 0; i < 8 + Math.floor(Math.random() * 8); i++) {
+    const maxLen = 20 - code.length;
+    const len = Math.min(maxLen, 6 + Math.floor(Math.random() * 8));
+    for (let i = 0; i < len; i++) {
       code += chars[Math.floor(Math.random() * chars.length)];
     }
     return code;
@@ -304,9 +360,22 @@ class TestBarcodeGenerator {
    */
   generateRandomITF() {
     let code = '';
-    const length = 12 + Math.floor(Math.random() * 4) * 2; // ITF 需要偶數長度
+    const length = 12 + Math.floor(Math.random() * 3) * 2; // ITF 偶數長度，max 16
     for (let i = 0; i < length; i++) {
       code += Math.floor(Math.random() * 10);
+    }
+    return code;
+  }
+
+  /**
+   * 產生隨機 Data Matrix 值（≤ 20 字元）
+   */
+  generateRandomDataMatrix() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = 'DM-';
+    const len = 6 + Math.floor(Math.random() * 11); // 6-16，總長 9-19
+    for (let i = 0; i < len; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
     }
     return code;
   }
@@ -387,7 +456,7 @@ class TestBarcodeGenerator {
     // 值
     const valueSpan = document.createElement('div');
     valueSpan.className = 'value';
-    valueSpan.textContent = value.length > 15 ? value.substring(0, 15) + '...' : value;
+    valueSpan.textContent = value.length > 20 ? value.substring(0, 20) + '...' : value;
     valueSpan.title = value;
     
     card.appendChild(canvas);
@@ -403,6 +472,65 @@ class TestBarcodeGenerator {
     return card;
   }
   
+  /**
+   * 建立 Data Matrix 卡片（使用 bwip-js）
+   */
+  async createDataMatrixCard(value, name, options = {}) {
+    const card = document.createElement('div');
+    card.className = 'test-barcode-card';
+
+    const sizeConfig = { 'xs': 2, 'sm': 3, 'md': 4, 'lg': 5, 'xl': 6 };
+    const scale = sizeConfig[options.size] || 4;
+
+    const canvas = document.createElement('canvas');
+    canvas.className = 'barcode-canvas';
+
+    try {
+      bwipjs.toCanvas(canvas, {
+        bcid: 'datamatrix',
+        text: value,
+        scale: scale,
+        padding: 5,
+      });
+    } catch (e) {
+      console.error('[Generator] Data Matrix 產生失敗:', e);
+      canvas.width = 100;
+      canvas.height = 100;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillRect(0, 0, 100, 100);
+      ctx.fillStyle = '#999';
+      ctx.textAlign = 'center';
+      ctx.fillText('DM Error', 50, 50);
+    }
+
+    if (options.rotate && options.rotate !== 0) {
+      card.style.transform = `rotate(${options.rotate}deg)`;
+      card.classList.add('rotated');
+    }
+
+    const formatBadge = document.createElement('span');
+    formatBadge.className = 'format';
+    formatBadge.textContent = 'DATA MATRIX';
+    if (options.size) formatBadge.textContent += ` (${options.size})`;
+
+    const valueSpan = document.createElement('div');
+    valueSpan.className = 'value';
+    valueSpan.textContent = value.length > 20 ? value.substring(0, 20) + '...' : value;
+    valueSpan.title = value;
+
+    card.appendChild(canvas);
+    card.appendChild(formatBadge);
+    card.appendChild(valueSpan);
+
+    card.addEventListener('click', () => {
+      this.copyToClipboard(value);
+      this.showToast(`已複製: ${value}`);
+    });
+
+    return card;
+  }
+
   /**
    * 建立 QR Code 卡片
    */
@@ -454,7 +582,7 @@ class TestBarcodeGenerator {
     // 值
     const valueSpan = document.createElement('div');
     valueSpan.className = 'value';
-    valueSpan.textContent = value.length > 15 ? value.substring(0, 15) + '...' : value;
+    valueSpan.textContent = value.length > 20 ? value.substring(0, 20) + '...' : value;
     valueSpan.title = value;
     
     card.appendChild(qrContainer);
@@ -543,14 +671,24 @@ class TestBarcodeGenerator {
       }
     }
     
-    // 產生隨機 QR Code
+    // 產生隨機 QR Code（值 ≤ 20 字元）
     for (let i = 0; i < 2; i++) {
-      const qrValue = `https://test.com/qr/${Date.now()}-${i}`;
+      const qrValue = ('QR-' + Date.now().toString(36) + i).substring(0, 20);
       const card = await this.createQRCard(qrValue, '隨機 QR');
       this.container.appendChild(card);
       this.barcodes.push({ format: 'qr_code', value: qrValue, element: card });
     }
-    
+
+    // 產生隨機 Data Matrix
+    if (window.bwipjs) {
+      for (let i = 0; i < 2; i++) {
+        const dmValue = this.getRandomValue('data_matrix');
+        const card = await this.createDataMatrixCard(dmValue, '隨機 DM');
+        this.container.appendChild(card);
+        this.barcodes.push({ format: 'data_matrix', value: dmValue, element: card });
+      }
+    }
+
     // 產生隨機變體
     await this.generateVariants();
     

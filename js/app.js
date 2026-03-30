@@ -22,6 +22,8 @@ class BarcodeScannerApp {
     this.confidenceValue = document.getElementById('confidenceValue');
     this.pyramidScalesInput = document.getElementById('pyramidScales');
     this.formatCheckboxes = document.querySelectorAll('.control-panel .checkbox-group input[type="checkbox"]');
+    this.enableRotationCheckbox = document.getElementById('enableRotation');
+    this.enableEnhancementCheckbox = document.getElementById('enableEnhancement');
     this.validateEANCheckbox = document.getElementById('validateEAN');
     this.validateCode128Checkbox = document.getElementById('validateCode128');
     this.filterDuplicatesCheckbox = document.getElementById('filterDuplicates');
@@ -83,6 +85,8 @@ class BarcodeScannerApp {
       minConfidence: parseInt(this.minConfidenceInput.value),
       pyramidScales: this.parsePyramidScales(),
       allowedFormats: this.getAllowedFormats(),
+      enableRotation: this.enableRotationCheckbox.checked,
+      enableEnhancement: this.enableEnhancementCheckbox.checked,
       validateEAN: this.validateEANCheckbox.checked,
       validateCode128: this.validateCode128Checkbox.checked,
       filterDuplicates: this.filterDuplicatesCheckbox.checked
@@ -154,6 +158,8 @@ class BarcodeScannerApp {
     });
     this.pyramidScalesInput.addEventListener('change', () => this.updateConfig());
     this.formatCheckboxes.forEach(cb => cb.addEventListener('change', () => this.updateConfig()));
+    this.enableRotationCheckbox.addEventListener('change', () => this.updateConfig());
+    this.enableEnhancementCheckbox.addEventListener('change', () => this.updateConfig());
     this.validateEANCheckbox.addEventListener('change', () => this.updateConfig());
     this.validateCode128Checkbox.addEventListener('change', () => this.updateConfig());
     this.filterDuplicatesCheckbox.addEventListener('change', () => this.updateConfig());
@@ -436,6 +442,8 @@ class BarcodeScannerApp {
       minConfidence: parseInt(this.minConfidenceInput.value),
       pyramidScales: this.parsePyramidScales(),
       allowedFormats: this.getAllowedFormats(),
+      enableRotation: this.enableRotationCheckbox.checked,
+      enableEnhancement: this.enableEnhancementCheckbox.checked,
       validateEAN: this.validateEANCheckbox.checked,
       validateCode128: this.validateCode128Checkbox.checked,
       filterDuplicates: this.filterDuplicatesCheckbox.checked

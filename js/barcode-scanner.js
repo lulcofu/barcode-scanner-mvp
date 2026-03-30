@@ -17,12 +17,17 @@ class BarcodeScannerCore {
       minConfidence: config.minConfidence || 3,
       maxAge: config.maxAge || 10000,
       
+      // 辨識增強
+      enableRotation: config.enableRotation || false,
+      enableEnhancement: config.enableEnhancement || false,
+      rotationAngles: config.rotationAngles || [-10, -5, 5, 10],
+
       // 條碼類型白名單
       allowedFormats: config.allowedFormats || [
         'ean_13', 'ean_8', 'code_128', 'code_39',
         'qr_code', 'data_matrix', 'pdf_417', 'itf'
       ],
-      
+
       // 驗證設定
       validateEAN: config.validateEAN !== false,
       validateCode128: config.validateCode128 !== false,
@@ -172,20 +177,26 @@ class BarcodeScannerCore {
     
     try {
       // 建立畫布
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
+      let canvas = document.createElement('canvas');
+      let ctx = canvas.getContext('2d');
+
       // 設定解析度
       const scale = Math.min(1, this.config.targetResolution / Math.max(
         this.videoElement.videoWidth,
         this.videoElement.videoHeight
       ));
-      
+
       canvas.width = this.videoElement.videoWidth * scale;
       canvas.height = this.videoElement.videoHeight * scale;
-      
+
       ctx.drawImage(this.videoElement, 0, 0, canvas.width, canvas.height);
-      
+
+      // 影像增強（僅處理一次基底畫布）
+      if (this.config.enableEnhancement) {
+        canvas = this.enhanceImage(canvas);
+        ctx = canvas.getContext('2d');
+      }
+
       // 根據掃描模式選擇方法
       let results = [];
       
@@ -338,31 +349,39 @@ class BarcodeScannerCore {
   }
   
   /**
-   * 使用 ZXing 偵測條碼
+   * 使用 ZXing 偵測條碼（支援多角度旋轉）
    */
   async detectBarcodes(canvas) {
     try {
       const results = [];
 
-      // 使用 ZXing-js 從 canvas 解碼
-      try {
-        const decoded = this.codeReader.decodeFromCanvas(canvas);
-        if (decoded) {
-          results.push(this.convertZXingResult(decoded, canvas));
-        }
-      } catch (e) {
-        // NotFoundException 沒找到條碼是正常的，其他錯誤記錄
-        if (e.name && e.name !== 'NotFoundException' && e.type !== 'NotFoundException') {
-          console.warn('[Scanner] ZXing 解碼錯誤:', e.name || e.type, e.message);
+      // 原始方向解碼
+      const baseResult = this.tryZXingDecode(canvas);
+      if (baseResult) results.push(baseResult);
+
+      // 多角度旋轉掃描
+      if (this.config.enableRotation) {
+        for (const angle of this.config.rotationAngles) {
+          const rotated = this.rotateCanvas(canvas, angle);
+          const result = this.tryZXingDecode(rotated);
+          if (result) {
+            result.boundingBox = null; // 旋轉後 bbox 無意義
+            result.detectedAtAngle = angle;
+            // 避免與已有結果重複
+            const exists = results.some(r =>
+              r.format === result.format && r.rawValue === result.rawValue
+            );
+            if (!exists) results.push(result);
+          }
         }
       }
-      
+
       // 嘗試使用原生 API（如果支援）
       if ('BarcodeDetector' in window && this.nativeFormats) {
         try {
           const detector = new BarcodeDetector({ formats: this.config.allowedFormats });
           const nativeResults = await detector.detect(canvas);
-          
+
           for (const result of nativeResults) {
             const converted = {
               format: this.normalizeFormat(result.format),
@@ -371,12 +390,11 @@ class BarcodeScannerCore {
               confidence: 1,
               source: 'native'
             };
-            
-            // 避免重複
-            const exists = results.some(r => 
+
+            const exists = results.some(r =>
               r.format === converted.format && r.rawValue === converted.rawValue
             );
-            
+
             if (!exists) {
               results.push(converted);
             }
@@ -385,13 +403,105 @@ class BarcodeScannerCore {
           // 忽略原生 API 錯誤
         }
       }
-      
+
       return results;
-      
+
     } catch (e) {
       console.warn('[Scanner] 偵測錯誤:', e);
       return [];
     }
+  }
+
+  /**
+   * 嘗試 ZXing 解碼（單次）
+   */
+  tryZXingDecode(canvas) {
+    try {
+      const decoded = this.codeReader.decodeFromCanvas(canvas);
+      if (decoded) {
+        return this.convertZXingResult(decoded, canvas);
+      }
+    } catch (e) {
+      if (e.name && e.name !== 'NotFoundException' && e.type !== 'NotFoundException') {
+        console.warn('[Scanner] ZXing 解碼錯誤:', e.name || e.type);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 旋轉畫布
+   */
+  rotateCanvas(canvas, angleDeg) {
+    const rad = angleDeg * Math.PI / 180;
+    const cos = Math.abs(Math.cos(rad));
+    const sin = Math.abs(Math.sin(rad));
+    const w = canvas.width, h = canvas.height;
+    const newW = Math.ceil(w * cos + h * sin);
+    const newH = Math.ceil(w * sin + h * cos);
+
+    const rotated = document.createElement('canvas');
+    rotated.width = newW;
+    rotated.height = newH;
+    const ctx = rotated.getContext('2d');
+
+    ctx.translate(newW / 2, newH / 2);
+    ctx.rotate(rad);
+    ctx.drawImage(canvas, -w / 2, -h / 2);
+
+    return rotated;
+  }
+
+  /**
+   * 影像增強：灰階 + 對比度提升 + 銳化
+   */
+  enhanceImage(canvas) {
+    const w = canvas.width, h = canvas.height;
+    const enhanced = document.createElement('canvas');
+    enhanced.width = w;
+    enhanced.height = h;
+    const ctx = enhanced.getContext('2d');
+
+    // 灰階 + 對比度（優先使用 canvas filter，GPU 加速）
+    try {
+      ctx.filter = 'grayscale(1) contrast(1.5)';
+      ctx.drawImage(canvas, 0, 0);
+      ctx.filter = 'none';
+    } catch (e) {
+      ctx.drawImage(canvas, 0, 0);
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const gray = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+        const val = Math.max(0, Math.min(255, (gray - 128) * 1.5 + 128));
+        d[i] = d[i + 1] = d[i + 2] = val;
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+
+    // 銳化 3×3 kernel（僅在解析度合理時執行，避免影響效能）
+    if (w * h <= 600000) {
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const src = new Uint8ClampedArray(imgData.data);
+      const dst = imgData.data;
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const idx = (y * w + x) * 4;
+          for (let c = 0; c < 3; c++) {
+            const val =
+              -src[((y - 1) * w + x) * 4 + c]
+              - src[(y * w + x - 1) * 4 + c]
+              + 5 * src[idx + c]
+              - src[(y * w + x + 1) * 4 + c]
+              - src[((y + 1) * w + x) * 4 + c];
+            dst[idx + c] = Math.max(0, Math.min(255, val));
+          }
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+
+    return enhanced;
   }
   
   /**
