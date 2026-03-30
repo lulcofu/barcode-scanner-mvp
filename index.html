@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>多條碼掃描器 MVP</title>
   <link rel="stylesheet" href="css/style.css">
-  <!-- getUserMedia polyfill -->
   <script>
     if (navigator.mediaDevices === undefined) navigator.mediaDevices = {};
     if (navigator.mediaDevices.getUserMedia === undefined) {
@@ -16,7 +15,6 @@
       };
     }
   </script>
-  <!-- ZXing-js -->
   <script src="https://unpkg.com/@zxing/browser@0.1.5"></script>
   <script>window.ZXing = window.ZXingBrowser || window.ZXing;</script>
 </head>
@@ -27,7 +25,6 @@
       <p class="subtitle">支援 1D/2D 條碼 | 多尺度掃描 | 即時過濾</p>
     </header>
 
-    <!-- Tab Bar -->
     <nav class="tab-bar">
       <div class="tab-buttons">
         <button class="tab-btn active" data-tab="scanner">掃描器</button>
@@ -38,10 +35,9 @@
       </button>
     </nav>
 
-    <!-- ===== Tab: 掃描器 ===== -->
+    <!-- ========== Tab: 掃描器 ========== -->
     <div class="tab-pane active" data-tab-pane="scanner">
 
-      <!-- 控制面板 -->
       <div class="control-panel">
         <div class="control-group">
           <label>掃描模式：</label>
@@ -75,14 +71,13 @@
         </div>
       </div>
 
-      <!-- 視訊區域 -->
+      <!-- 相機 -->
       <div class="video-container">
         <div class="video-wrapper">
           <video id="video" autoplay playsinline></video>
           <canvas id="overlay"></canvas>
           <div class="scan-indicator" id="scanIndicator">
-            <span class="spinner"></span>
-            掃描中...
+            <span class="spinner"></span> 掃描中...
           </div>
         </div>
         <div class="button-group">
@@ -94,7 +89,18 @@
         </div>
       </div>
 
-      <!-- 統計區域 -->
+      <!-- 即時辨識（固定高度，避免閃爍） -->
+      <div class="live-detect-section">
+        <div class="live-detect-header">
+          <span class="live-detect-title">即時辨識</span>
+          <span class="live-detect-count" id="liveCount">0 個</span>
+        </div>
+        <div class="live-detect-box" id="liveDetectBox">
+          <span class="live-detect-empty">等待掃描...</span>
+        </div>
+      </div>
+
+      <!-- 統計 -->
       <div class="stats-section">
         <div class="stats-grid">
           <div class="stat-card">
@@ -116,18 +122,17 @@
         </div>
       </div>
 
-      <!-- 結果區域 -->
-      <div class="results-section">
-        <h2>掃描結果</h2>
-        <div class="results-info">
-          <span id="totalScanned">已掃描: 0 個條碼</span>
-          <span id="stableCount">穩定結果: 0 個</span>
-        </div>
-        <div id="results" class="results-grid">
-          <div class="empty-state">
-            <p>尚無掃描結果</p>
-            <p class="hint">請開啟相機或上傳圖片開始掃描</p>
+      <!-- 累計掃描結果（去重明文列表） -->
+      <div class="accumulated-section">
+        <div class="accumulated-header">
+          <h2>累計掃描結果 <span id="accumulatedCount">0</span> 個</h2>
+          <div class="accumulated-actions">
+            <button id="copyAccumulatedBtn" class="btn small primary">複製列表</button>
+            <button id="clearAccumulatedBtn" class="btn small secondary">清除</button>
           </div>
+        </div>
+        <div class="accumulated-list" id="accumulatedList">
+          <span class="empty-hint">尚無累計結果</span>
         </div>
       </div>
 
@@ -151,45 +156,43 @@
       </div>
     </div>
 
-    <!-- ===== Tab: 測試條碼 ===== -->
+    <!-- ========== Tab: 測試條碼 ========== -->
     <div class="tab-pane" data-tab-pane="test">
 
-      <!-- 測試條碼產生器 -->
+      <!-- 條碼產生器 -->
       <div class="test-section">
         <h2>測試用條碼</h2>
-        <p>點擊條碼可放大查看，用於測試掃描功能</p>
+        <p>點擊條碼可複製值，用於測試掃描功能</p>
         <div class="test-controls">
-          <button id="generateTestBtn" class="btn secondary">重新產生測試條碼</button>
+          <button id="generateTestBtn" class="btn secondary">重新產生</button>
           <button id="printTestBtn" class="btn secondary">列印測試頁</button>
         </div>
         <div id="testBarcodes" class="test-barcodes-grid"></div>
       </div>
 
+      <!-- 條碼明文列表 -->
+      <div class="barcode-plaintext-section">
+        <div class="barcode-plaintext-header">
+          <h2>條碼明文列表</h2>
+          <button id="copyPlaintextBtn" class="btn small primary">複製</button>
+        </div>
+        <div class="barcode-plaintext-box" id="barcodePlaintextBox">
+          <span class="empty-hint">尚未產生條碼</span>
+        </div>
+      </div>
+
       <!-- 比對工具 -->
       <div class="comparison-section">
         <h2>辨識率比對</h2>
-        <p class="hint">A 電腦開啟本頁輸入預期條碼，手機掃描後將已辨識列表貼入比對</p>
-
-        <div class="comparison-columns">
-          <div class="comparison-panel">
-            <h3>預期條碼（每行一個）</h3>
-            <textarea id="expectedBarcodes" rows="8" placeholder="每行輸入一個條碼字串&#10;例如：&#10;4711234567890&#10;9780201379624&#10;CODE-128-TEST-001"></textarea>
-          </div>
-          <div class="comparison-panel">
-            <h3>已辨識條碼</h3>
-            <textarea id="recognizedBarcodes" rows="8" placeholder="從掃描器複製已辨識的條碼列表貼入此處" readonly></textarea>
-            <div class="recognized-actions">
-              <button id="copyRecognizedBtn" class="btn small">複製列表</button>
-              <button id="clearRecognizedBtn" class="btn small">清除</button>
-            </div>
-          </div>
+        <p class="hint">將掃描器頁「累計掃描結果」複製後貼入下方，與上方條碼明文列表進行比對</p>
+        <div class="comparison-input-area">
+          <h3>掃描結果（貼入）</h3>
+          <textarea id="scannedInput" rows="6" placeholder="從掃描器頁複製累計結果後貼入此處&#10;每行一個條碼"></textarea>
         </div>
-
         <div class="comparison-actions">
           <button id="compareBtn" class="btn primary">開始比對</button>
           <button id="clearCompareBtn" class="btn secondary">清除比對結果</button>
         </div>
-
         <div id="comparisonResults" class="comparison-results"></div>
       </div>
     </div>
