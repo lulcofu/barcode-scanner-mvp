@@ -101,7 +101,7 @@ class TestBarcodeGenerator {
 
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/bwip-js@3.4.6/dist/bwip-js-min.js';
+      script.src = 'https://cdn.jsdelivr.net/npm/bwip-js@3.4.5/dist/bwip-js-min.js';
       script.onload = () => {
         console.log('[Generator] bwip-js 載入成功');
         resolve(true);
