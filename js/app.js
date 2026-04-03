@@ -1,4 +1,37 @@
 /**
+ * 解析 Ollama NDJSON streaming 回應，提取所有 message.content 拼接
+ * 處理黏接的 JSON 物件（無換行分隔）及內容中含 }{ 的情況
+ */
+function parseOllamaNDJSON(text) {
+  let content = '';
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] !== '{') { i++; continue; }
+    let depth = 0, inStr = false, esc = false, j = i;
+    for (; j < text.length; j++) {
+      const c = text[j];
+      if (esc) { esc = false; continue; }
+      if (c === '\\' && inStr) { esc = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (c === '{') depth++;
+      if (c === '}') { depth--; if (depth === 0) { j++; break; } }
+    }
+    try {
+      const obj = JSON.parse(text.slice(i, j));
+      if (obj.message?.content) content += obj.message.content;
+    } catch (e) { /* skip */ }
+    i = j;
+  }
+  return content;
+}
+
+// 供測試使用
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { parseOllamaNDJSON };
+}
+
+/**
  * 主要應用程式 — SPA 架構
  * 掃描器 Tab | 過濾設定 Tab | 測試條碼 Tab
  */
@@ -738,29 +771,8 @@ class BarcodeScannerApp {
 
     const text = await resp.text();
 
-    // Ollama streaming：逐一解析黏接的 JSON 物件（避免內容中的 }{ 被誤切）
     if (format === 'ollama-local') {
-      let content = '';
-      let i = 0;
-      while (i < text.length) {
-        if (text[i] !== '{') { i++; continue; }
-        let depth = 0, inStr = false, esc = false, j = i;
-        for (; j < text.length; j++) {
-          const c = text[j];
-          if (esc) { esc = false; continue; }
-          if (c === '\\' && inStr) { esc = true; continue; }
-          if (c === '"') { inStr = !inStr; continue; }
-          if (inStr) continue;
-          if (c === '{') depth++;
-          if (c === '}') { depth--; if (depth === 0) { j++; break; } }
-        }
-        try {
-          const obj = JSON.parse(text.slice(i, j));
-          if (obj.message?.content) content += obj.message.content;
-        } catch (e) { /* skip */ }
-        i = j;
-      }
-      return content;
+      return parseOllamaNDJSON(text);
     }
 
     const data = JSON.parse(text);
@@ -868,7 +880,7 @@ class BarcodeScannerApp {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => {
   const app = new BarcodeScannerApp();
   app.initialize().catch(e => console.error('[App] 啟動失敗:', e));
 });
