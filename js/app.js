@@ -738,15 +738,16 @@ class BarcodeScannerApp {
 
     const text = await resp.text();
 
-    // Ollama 可能回傳 NDJSON streaming（每行一個 JSON），需拼接
+    // Ollama streaming：JSON 物件可能以 }\n{ 或 }{ 黏接
     if (format === 'ollama-local') {
       let content = '';
-      for (const line of text.split('\n')) {
-        if (!line.trim()) continue;
+      for (const chunk of text.split(/\}\s*\{/).map((s, i, a) =>
+        (i > 0 ? '{' : '') + s + (i < a.length - 1 ? '}' : '')
+      )) {
         try {
-          const obj = JSON.parse(line);
+          const obj = JSON.parse(chunk);
           if (obj.message?.content) content += obj.message.content;
-        } catch (e) { /* skip non-JSON lines */ }
+        } catch (e) { /* skip unparseable chunks */ }
       }
       return content;
     }
