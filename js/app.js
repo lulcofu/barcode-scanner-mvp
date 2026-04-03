@@ -652,6 +652,7 @@ class BarcodeScannerApp {
     const settings = this.getAISettings();
     if (!settings.url) { this.handleError(new Error('請先在「AI 設定」填入 API 路徑')); return; }
     if (!settings.model) { this.handleError(new Error('請先在「AI 設定」填入模型名稱')); return; }
+    if (!settings.token) { this.handleError(new Error('請先在「AI 設定」填入 API Token')); return; }
 
     const prompt = `Based on the following ${lines.length} example strings, generate a single regular expression that matches all of them. Return ONLY the regex pattern string, nothing else. No explanation, no markdown, no code block, just the raw pattern.\n\nExample strings:\n${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}`;
 
@@ -763,6 +764,7 @@ class BarcodeScannerApp {
   }
 
   onApiFormatChange() {
+    const fmt = this.aiApiFormat.value;
     const defaults = {
       openai: 'https://api.openai.com/v1/chat/completions',
       ollama: 'https://ollama.com/api/chat',
@@ -770,11 +772,22 @@ class BarcodeScannerApp {
     };
     const current = this.aiApiUrl.value.trim();
     const isDefault = !current || Object.values(defaults).includes(current);
-    if (isDefault) this.aiApiUrl.value = defaults[this.aiApiFormat.value] || '';
+    if (isDefault) this.aiApiUrl.value = defaults[fmt] || '';
+
+    // 動態 placeholder 與提示
+    const tokenHints = {
+      ollama: { placeholder: 'Ollama API Key（必填）', hint: '至 ollama.com/settings/keys 取得' },
+      openai: { placeholder: 'API Key（必填）', hint: '' },
+      anthropic: { placeholder: 'API Key（必填）', hint: '' }
+    };
+    const h = tokenHints[fmt] || tokenHints.openai;
+    this.aiApiToken.placeholder = h.placeholder;
+    const tokenHintEl = document.getElementById('tokenHint');
+    if (tokenHintEl) tokenHintEl.textContent = h.hint;
 
     // Anthropic CORS 警告
     if (this.anthropicWarning) {
-      this.anthropicWarning.hidden = this.aiApiFormat.value !== 'anthropic';
+      this.anthropicWarning.hidden = fmt !== 'anthropic';
     }
   }
 
