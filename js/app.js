@@ -607,7 +607,7 @@ class BarcodeScannerApp {
 
       if (this.editingRuleId === rule.id) {
         html += `<div class="regex-rule editing" data-id="${rule.id}">
-          <input type="checkbox" ${ck} class="rule-toggle">
+          <label class="toggle-label"><input type="checkbox" ${ck} class="rule-toggle"></label>
           <input type="text" class="rule-name-input" value="${this.escAttr(rule.name)}">
           <input type="text" class="rule-pattern-input" value="${this.escAttr(rule.pattern)}">
           <button class="btn-icon rule-save" title="儲存">&#10003;</button>
@@ -615,7 +615,7 @@ class BarcodeScannerApp {
         </div>`;
       } else {
         html += `<div class="regex-rule${cls}" data-id="${rule.id}">
-          <input type="checkbox" ${ck} class="rule-toggle">
+          <label class="toggle-label"><input type="checkbox" ${ck} class="rule-toggle"></label>
           <span class="rule-name">${this.esc(rule.name)}</span>
           <code class="rule-pattern">${this.esc(rule.pattern)}</code>
           <button class="btn-icon rule-edit" title="編輯">&#9998;</button>
