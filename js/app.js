@@ -738,16 +738,27 @@ class BarcodeScannerApp {
 
     const text = await resp.text();
 
-    // Ollama streaming：JSON 物件可能以 }\n{ 或 }{ 黏接
+    // Ollama streaming：逐一解析黏接的 JSON 物件（避免內容中的 }{ 被誤切）
     if (format === 'ollama-local') {
       let content = '';
-      for (const chunk of text.split(/\}\s*\{/).map((s, i, a) =>
-        (i > 0 ? '{' : '') + s + (i < a.length - 1 ? '}' : '')
-      )) {
+      let i = 0;
+      while (i < text.length) {
+        if (text[i] !== '{') { i++; continue; }
+        let depth = 0, inStr = false, esc = false, j = i;
+        for (; j < text.length; j++) {
+          const c = text[j];
+          if (esc) { esc = false; continue; }
+          if (c === '\\' && inStr) { esc = true; continue; }
+          if (c === '"') { inStr = !inStr; continue; }
+          if (inStr) continue;
+          if (c === '{') depth++;
+          if (c === '}') { depth--; if (depth === 0) { j++; break; } }
+        }
         try {
-          const obj = JSON.parse(chunk);
+          const obj = JSON.parse(text.slice(i, j));
           if (obj.message?.content) content += obj.message.content;
-        } catch (e) { /* skip unparseable chunks */ }
+        } catch (e) { /* skip */ }
+        i = j;
       }
       return content;
     }
