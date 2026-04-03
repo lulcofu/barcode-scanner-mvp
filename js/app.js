@@ -771,12 +771,13 @@ class BarcodeScannerApp {
     }
 
     const text = await resp.text();
-    console.log('[callAI] raw response length:', text.length);
-    console.log('[callAI] raw response (first 1000):', text.substring(0, 1000));
+    console.log('[callAI] format:', format, '| response length:', text.length);
 
-    if (format === 'ollama-local') {
+    // Ollama 本地或自動偵測 NDJSON（多個 JSON 物件黏接）
+    const isNDJSON = format === 'ollama-local' || /^\s*\{[^]*"done"/.test(text.substring(0, 200));
+    if (isNDJSON) {
       const result = parseOllamaNDJSON(text);
-      console.log('[callAI] parsed result:', JSON.stringify(result));
+      console.log('[callAI] parsed NDJSON result:', JSON.stringify(result));
       if (!result && text.length > 0) {
         throw new Error('NDJSON 解析結果為空\n\nRaw (前 500 字):\n' + text.substring(0, 500));
       }
@@ -797,7 +798,9 @@ class BarcodeScannerApp {
       const saved = localStorage.getItem('barcode-ai-settings');
       if (saved) {
         const s = JSON.parse(saved);
-        this.aiApiFormat.value = s.format || 'ollama-local';
+        // 遷移舊設定值 'ollama' → 'ollama-local'
+        const fmt = s.format === 'ollama' ? 'ollama-local' : (s.format || 'ollama-local');
+        this.aiApiFormat.value = fmt;
         this.aiApiUrl.value = s.url || '';
         this.aiApiToken.value = s.token || '';
         this.aiModel.value = s.model || '';
