@@ -654,17 +654,22 @@ class BarcodeScannerApp {
     if (!settings.model) { this.handleError(new Error('請先在「AI 設定」填入模型名稱')); return; }
     if (!settings.token && settings.format !== 'ollama-local') { this.handleError(new Error('請先在「AI 設定」填入 API Token')); return; }
 
-    const prompt = `Based on the following ${lines.length} example strings, generate a single regular expression that matches all of them. Return ONLY the regex pattern string, nothing else. No explanation, no markdown, no code block, just the raw pattern.\n\nExample strings:\n${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}`;
+    const messages = [
+      { role: 'system', content: 'You are a regex generator. Reply with ONLY the regex pattern. No explanation, no markdown, no code fences, no slashes. One line only.' },
+      { role: 'user', content: lines.join('\n') }
+    ];
 
     this.aiGenerateBtn.disabled = true;
     this.aiStatus.textContent = '產生中...';
     this.aiResult.hidden = true;
 
     try {
-      const result = await this.callAI(prompt, settings);
-      // 清理 AI 回傳：移除 /.../ 包裝、移除 markdown code block
-      let pattern = result.trim()
-        .replace(/^```[^\n]*\n?/, '').replace(/\n?```$/, '')
+      const result = await this.callAI(messages, settings);
+      // 清理 AI 回傳：取第一行、移除 code block / 引號 / /.../ 包裝
+      let pattern = result.trim().split('\n')[0].trim()
+        .replace(/^```[^\n]*/, '').replace(/```$/, '')
+        .replace(/^`|`$/g, '')
+        .replace(/^["']|["']$/g, '')
         .replace(/^\/(.+)\/[gimsuvy]*$/, '$1')
         .trim();
 
@@ -691,30 +696,32 @@ class BarcodeScannerApp {
     this.ruleNameInput.focus();
   }
 
-  async callAI(prompt, settings) {
+  async callAI(messages, settings) {
     const { format, url, token, model } = settings;
     let headers = { 'Content-Type': 'application/json' };
     let body;
 
     if (format === 'anthropic') {
+      // Anthropic 不支援 system role in messages，需拆出
+      const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
+      const msgs = messages.filter(m => m.role !== 'system');
       headers['x-api-key'] = token;
       headers['anthropic-version'] = '2023-06-01';
       body = JSON.stringify({
-        model, max_tokens: 200,
-        messages: [{ role: 'user', content: prompt }]
+        model, max_tokens: 200, system,
+        messages: msgs
       });
     } else if (format === 'ollama-local') {
-      // 本地 Ollama 不需要 token
       body = JSON.stringify({
         model, stream: false,
-        messages: [{ role: 'user', content: prompt }]
+        messages
       });
     } else {
       // openai 相容
       if (token) headers['Authorization'] = 'Bearer ' + token;
       body = JSON.stringify({
         model, max_tokens: 200,
-        messages: [{ role: 'user', content: prompt }]
+        messages
       });
     }
 
