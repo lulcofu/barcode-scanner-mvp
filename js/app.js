@@ -729,10 +729,23 @@ class BarcodeScannerApp {
       throw new Error(`API ${resp.status}: ${text.substring(0, 200)}`);
     }
 
-    const data = await resp.json();
+    const text = await resp.text();
 
+    // Ollama 可能回傳 NDJSON streaming（每行一個 JSON），需拼接
+    if (format === 'ollama-local') {
+      let content = '';
+      for (const line of text.split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const obj = JSON.parse(line);
+          if (obj.message?.content) content += obj.message.content;
+        } catch (e) { /* skip non-JSON lines */ }
+      }
+      return content;
+    }
+
+    const data = JSON.parse(text);
     if (format === 'anthropic') return data.content?.[0]?.text || '';
-    if (format === 'ollama-local') return data.message?.content || '';
     return data.choices?.[0]?.message?.content || '';
   }
 
