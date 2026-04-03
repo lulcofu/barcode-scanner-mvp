@@ -208,8 +208,8 @@
             <div class="setting-row">
               <label for="aiApiFormat">API 格式</label>
               <select id="aiApiFormat">
+                <option value="ollama-local">Ollama 本地</option>
                 <option value="openai">OpenAI 相容（OpenAI / Groq）</option>
-                <option value="ollama">Ollama 雲端</option>
                 <option value="anthropic">Anthropic</option>
               </select>
             </div>
@@ -231,9 +231,7 @@
             <button id="saveAiSettings" class="btn small primary">儲存</button>
             <span class="hint-text">設定僅存於本機瀏覽器</span>
           </div>
-          <div class="anthropic-warning" id="anthropicWarning" hidden>
-            瀏覽器直連 Anthropic 可能被 CORS 阻擋，建議使用 Ollama 或 OpenAI 相容 API
-          </div>
+          <div class="anthropic-warning" id="corsWarning" hidden></div>
         </div>
       </div>
 

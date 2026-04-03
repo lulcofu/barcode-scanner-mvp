@@ -51,7 +51,7 @@ class BarcodeScannerApp {
     this.aiApiUrl = document.getElementById('aiApiUrl');
     this.aiApiToken = document.getElementById('aiApiToken');
     this.aiModel = document.getElementById('aiModel');
-    this.anthropicWarning = document.getElementById('anthropicWarning');
+    this.corsWarning = document.getElementById('corsWarning');
 
     // 即時辨識
     this.liveDetectBox = document.getElementById('liveDetectBox');
@@ -652,7 +652,7 @@ class BarcodeScannerApp {
     const settings = this.getAISettings();
     if (!settings.url) { this.handleError(new Error('請先在「AI 設定」填入 API 路徑')); return; }
     if (!settings.model) { this.handleError(new Error('請先在「AI 設定」填入模型名稱')); return; }
-    if (!settings.token) { this.handleError(new Error('請先在「AI 設定」填入 API Token')); return; }
+    if (!settings.token && settings.format !== 'ollama-local') { this.handleError(new Error('請先在「AI 設定」填入 API Token')); return; }
 
     const prompt = `Based on the following ${lines.length} example strings, generate a single regular expression that matches all of them. Return ONLY the regex pattern string, nothing else. No explanation, no markdown, no code block, just the raw pattern.\n\nExample strings:\n${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}`;
 
@@ -703,8 +703,8 @@ class BarcodeScannerApp {
         model, max_tokens: 200,
         messages: [{ role: 'user', content: prompt }]
       });
-    } else if (format === 'ollama') {
-      if (token) headers['Authorization'] = 'Bearer ' + token;
+    } else if (format === 'ollama-local') {
+      // 本地 Ollama 不需要 token
       body = JSON.stringify({
         model, stream: false,
         messages: [{ role: 'user', content: prompt }]
@@ -718,7 +718,12 @@ class BarcodeScannerApp {
       });
     }
 
-    const resp = await fetch(url, { method: 'POST', headers, body });
+    let resp;
+    try {
+      resp = await fetch(url, { method: 'POST', headers, body });
+    } catch (e) {
+      throw new Error('無法連線，請確認 API 路徑正確且服務正在運行');
+    }
     if (!resp.ok) {
       const text = await resp.text().catch(() => '');
       throw new Error(`API ${resp.status}: ${text.substring(0, 200)}`);
@@ -727,7 +732,7 @@ class BarcodeScannerApp {
     const data = await resp.json();
 
     if (format === 'anthropic') return data.content?.[0]?.text || '';
-    if (format === 'ollama') return data.message?.content || '';
+    if (format === 'ollama-local') return data.message?.content || '';
     return data.choices?.[0]?.message?.content || '';
   }
 
@@ -740,7 +745,7 @@ class BarcodeScannerApp {
       const saved = localStorage.getItem('barcode-ai-settings');
       if (saved) {
         const s = JSON.parse(saved);
-        this.aiApiFormat.value = s.format || 'ollama';
+        this.aiApiFormat.value = s.format || 'ollama-local';
         this.aiApiUrl.value = s.url || '';
         this.aiApiToken.value = s.token || '';
         this.aiModel.value = s.model || '';
@@ -766,8 +771,8 @@ class BarcodeScannerApp {
   onApiFormatChange() {
     const fmt = this.aiApiFormat.value;
     const defaults = {
+      'ollama-local': 'http://localhost:11434/api/chat',
       openai: 'https://api.openai.com/v1/chat/completions',
-      ollama: 'https://ollama.com/api/chat',
       anthropic: 'https://api.anthropic.com/v1/messages'
     };
     const current = this.aiApiUrl.value.trim();
@@ -776,7 +781,7 @@ class BarcodeScannerApp {
 
     // 動態 placeholder 與提示
     const tokenHints = {
-      ollama: { placeholder: 'Ollama API Key（必填）', hint: '至 ollama.com/settings/keys 取得' },
+      'ollama-local': { placeholder: '免填（本地不需驗證）', hint: '請先啟動本地 Ollama 並拉取模型' },
       openai: { placeholder: 'API Key（必填）', hint: '' },
       anthropic: { placeholder: 'API Key（必填）', hint: '' }
     };
@@ -785,9 +790,14 @@ class BarcodeScannerApp {
     const tokenHintEl = document.getElementById('tokenHint');
     if (tokenHintEl) tokenHintEl.textContent = h.hint;
 
-    // Anthropic CORS 警告
-    if (this.anthropicWarning) {
-      this.anthropicWarning.hidden = fmt !== 'anthropic';
+    // CORS 警告
+    if (this.corsWarning) {
+      if (fmt === 'anthropic') {
+        this.corsWarning.textContent = '瀏覽器直連 Anthropic 會被 CORS 阻擋，建議使用本地 Ollama 或 OpenAI 相容 API';
+        this.corsWarning.hidden = false;
+      } else {
+        this.corsWarning.hidden = true;
+      }
     }
   }
 
