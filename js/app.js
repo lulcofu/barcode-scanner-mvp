@@ -480,12 +480,13 @@ class BarcodeScannerApp {
 
   handleError(error) {
     const d = document.createElement('div');
-    d.textContent = error.message;
     d.style.cssText = `position:fixed;top:16px;right:16px;background:var(--danger,#a05050);color:white;
-      padding:12px 16px;border-radius:8px;z-index:9999;max-width:360px;white-space:pre-wrap;
-      font-size:0.85rem;box-shadow:0 4px 12px rgba(0,0,0,0.3);`;
+      padding:12px 16px;border-radius:8px;z-index:9999;max-width:80vw;white-space:pre-wrap;
+      font-size:0.85rem;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;word-break:break-all;`;
+    d.textContent = error.message;
+    d.title = '點擊關閉';
+    d.addEventListener('click', () => d.remove());
     document.body.appendChild(d);
-    setTimeout(() => { d.style.opacity='0'; d.style.transition='opacity 0.3s'; setTimeout(()=>d.remove(),300); }, 4000);
   }
 
   // ========================================
@@ -770,9 +771,16 @@ class BarcodeScannerApp {
     }
 
     const text = await resp.text();
+    console.log('[callAI] raw response length:', text.length);
+    console.log('[callAI] raw response (first 1000):', text.substring(0, 1000));
 
     if (format === 'ollama-local') {
-      return parseOllamaNDJSON(text);
+      const result = parseOllamaNDJSON(text);
+      console.log('[callAI] parsed result:', JSON.stringify(result));
+      if (!result && text.length > 0) {
+        throw new Error('NDJSON 解析結果為空\n\nRaw (前 500 字):\n' + text.substring(0, 500));
+      }
+      return result;
     }
 
     const data = JSON.parse(text);
