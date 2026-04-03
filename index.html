@@ -28,6 +28,7 @@
     <nav class="tab-bar">
       <div class="tab-buttons">
         <button class="tab-btn active" data-tab="scanner">掃描器</button>
+        <button class="tab-btn" data-tab="filter">過濾設定</button>
         <button class="tab-btn" data-tab="test">測試條碼</button>
       </div>
       <button class="theme-toggle" id="themeToggle" title="切換主題">
@@ -143,24 +144,98 @@
         </div>
       </div>
 
-      <!-- 過濾設定 -->
+    </div>
+
+    <!-- ========== Tab: 過濾設定 ========== -->
+    <div class="tab-pane" data-tab-pane="filter">
+
+      <!-- 格式驗證 -->
       <div class="filter-section">
-        <h2>過濾設定</h2>
-        <div class="filter-group">
-          <label>格式驗證：</label>
-          <div class="checkbox-group">
-            <label><input type="checkbox" id="validateEAN" checked> EAN 檢查碼驗證</label>
-            <label><input type="checkbox" id="validateCode128" checked> Code-128 最小長度</label>
-            <label><input type="checkbox" id="filterDuplicates" checked> 過濾重複</label>
+        <h2>格式驗證</h2>
+        <div class="checkbox-group">
+          <label><input type="checkbox" id="validateEAN" checked> EAN 檢查碼驗證</label>
+          <label><input type="checkbox" id="validateCode128" checked> Code-128 最小長度</label>
+          <label><input type="checkbox" id="filterDuplicates" checked> 過濾重複</label>
+        </div>
+      </div>
+
+      <!-- 正則過濾器 -->
+      <div class="filter-section">
+        <div class="section-header">
+          <h2>正則過濾器</h2>
+          <span class="hint-badge">OR：符合任一即保留</span>
+        </div>
+
+        <div class="regex-add-row">
+          <input type="text" id="ruleName" placeholder="規則名稱" class="regex-input-name">
+          <input type="text" id="rulePattern" placeholder="正則表達式" class="regex-input-pattern">
+          <button id="addRuleBtn" class="btn small primary">新增</button>
+          <button id="aiToggleBtn" class="btn small secondary">AI 產生</button>
+        </div>
+
+        <!-- AI 產生面板 -->
+        <div class="ai-panel" id="aiPanel" hidden>
+          <div class="ai-panel-header">
+            <h3>AI 產生正則式</h3>
+            <button class="btn-icon" id="aiPanelCloseBtn">&times;</button>
+          </div>
+          <p class="hint">輸入 3~10 個範例字串（每行一個）</p>
+          <textarea id="aiSamples" rows="5" placeholder="每行一個範例字串&#10;例：&#10;PROD-ABC-123&#10;PROD-DEF-456&#10;PROD-GHI-789"></textarea>
+          <div class="ai-panel-actions">
+            <button id="aiGenerateBtn" class="btn small primary" disabled>產生正則式</button>
+            <span id="aiStatus" class="ai-status"></span>
+          </div>
+          <div class="ai-result" id="aiResult" hidden>
+            <label>AI 建議：</label>
+            <div class="ai-result-row">
+              <input type="text" id="aiResultPattern" readonly>
+              <button id="aiUseBtn" class="btn small primary">套用</button>
+            </div>
           </div>
         </div>
-        <div class="filter-group">
-          <label>內容過濾（正則表達式）：</label>
-          <input type="text" id="contentFilter" placeholder="例: ^[0-9]{13}$ (EAN-13 格式)">
-          <button id="addFilterBtn" class="btn small">新增過濾</button>
+
+        <!-- 規則列表 -->
+        <div class="regex-rules" id="regexRules">
+          <div class="regex-rules-empty">尚無過濾規則</div>
         </div>
-        <div id="activeFilters" class="active-filters"></div>
       </div>
+
+      <!-- AI 設定 -->
+      <div class="filter-section">
+        <h2 class="collapsible-toggle" id="aiSettingsToggle">AI 設定 <span class="collapse-arrow">&#9654;</span></h2>
+        <div class="collapsible-content" id="aiSettingsContent" hidden>
+          <div class="settings-grid">
+            <div class="setting-row">
+              <label for="aiApiFormat">API 格式</label>
+              <select id="aiApiFormat">
+                <option value="openai">OpenAI 相容（OpenAI / Groq）</option>
+                <option value="ollama">Ollama 雲端</option>
+                <option value="anthropic">Anthropic</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <label for="aiApiUrl">API 路徑</label>
+              <input type="text" id="aiApiUrl" placeholder="https://ollama.com/api/chat">
+            </div>
+            <div class="setting-row">
+              <label for="aiApiToken">API Token</label>
+              <input type="password" id="aiApiToken" placeholder="選填（Ollama 本地可空）">
+            </div>
+            <div class="setting-row">
+              <label for="aiModel">模型名稱</label>
+              <input type="text" id="aiModel" placeholder="例：gpt-oss:120b">
+            </div>
+          </div>
+          <div class="setting-actions">
+            <button id="saveAiSettings" class="btn small primary">儲存</button>
+            <span class="hint-text">設定僅存於本機瀏覽器</span>
+          </div>
+          <div class="anthropic-warning" id="anthropicWarning" hidden>
+            瀏覽器直連 Anthropic 可能被 CORS 阻擋，建議使用 Ollama 或 OpenAI 相容 API
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- ========== Tab: 測試條碼 ========== -->

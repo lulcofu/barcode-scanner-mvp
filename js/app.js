@@ -1,7 +1,6 @@
 /**
  * 主要應用程式 — SPA 架構
- * 掃描器 Tab: 相機 → 即時辨識 → 統計 → 累計明文 → 過濾
- * 測試條碼 Tab: 條碼圖 → 明文列表 → 比對工具
+ * 掃描器 Tab | 過濾設定 Tab | 測試條碼 Tab
  */
 
 class BarcodeScannerApp {
@@ -24,12 +23,35 @@ class BarcodeScannerApp {
     this.formatCheckboxes = document.querySelectorAll('.control-panel .checkbox-group input[type="checkbox"]');
     this.enableRotationCheckbox = document.getElementById('enableRotation');
     this.enableEnhancementCheckbox = document.getElementById('enableEnhancement');
+
+    // 過濾設定 Tab — 格式驗證
     this.validateEANCheckbox = document.getElementById('validateEAN');
     this.validateCode128Checkbox = document.getElementById('validateCode128');
     this.filterDuplicatesCheckbox = document.getElementById('filterDuplicates');
-    this.contentFilterInput = document.getElementById('contentFilter');
-    this.addFilterBtn = document.getElementById('addFilterBtn');
-    this.activeFilters = document.getElementById('activeFilters');
+
+    // 過濾設定 Tab — 正則規則
+    this.ruleNameInput = document.getElementById('ruleName');
+    this.rulePatternInput = document.getElementById('rulePattern');
+    this.addRuleBtn = document.getElementById('addRuleBtn');
+    this.regexRulesContainer = document.getElementById('regexRules');
+
+    // 過濾設定 Tab — AI 產生
+    this.aiToggleBtn = document.getElementById('aiToggleBtn');
+    this.aiPanel = document.getElementById('aiPanel');
+    this.aiPanelCloseBtn = document.getElementById('aiPanelCloseBtn');
+    this.aiSamples = document.getElementById('aiSamples');
+    this.aiGenerateBtn = document.getElementById('aiGenerateBtn');
+    this.aiStatus = document.getElementById('aiStatus');
+    this.aiResult = document.getElementById('aiResult');
+    this.aiResultPattern = document.getElementById('aiResultPattern');
+    this.aiUseBtn = document.getElementById('aiUseBtn');
+
+    // 過濾設定 Tab — AI 設定
+    this.aiApiFormat = document.getElementById('aiApiFormat');
+    this.aiApiUrl = document.getElementById('aiApiUrl');
+    this.aiApiToken = document.getElementById('aiApiToken');
+    this.aiModel = document.getElementById('aiModel');
+    this.anthropicWarning = document.getElementById('anthropicWarning');
 
     // 即時辨識
     this.liveDetectBox = document.getElementById('liveDetectBox');
@@ -73,12 +95,18 @@ class BarcodeScannerApp {
     this.stream = null;
     this.overlayCtx = null;
 
-    // 累計去重條碼（Set 保持插入順序）
+    // 累計去重條碼
     this.accumulatedValues = new Set();
+
+    // 正則規則
+    this.regexRules = [];
+    this.editingRuleId = null;
   }
 
   async initialize() {
     this.loadTheme();
+    this.loadRegexRules();
+    this.loadAISettings();
 
     this.scanner = new BarcodeScannerCore({
       scanMode: this.scanModeSelect.value,
@@ -96,9 +124,10 @@ class BarcodeScannerApp {
     await this.generator.initialize();
     this.setupEventListeners();
     await this.generator.generateAll(this.testBarcodesContainer);
-
-    // 產生後立刻更新測試頁明文列表
     this.updatePlaintextList();
+
+    // 套用已儲存的規則到掃描器
+    this.rebuildScannerFilters();
 
     this.scanner.onResults = (filtered, stable) => this.handleResults(filtered, stable);
     this.scanner.onStats = (stats) => this.handleStats(stats);
@@ -138,19 +167,20 @@ class BarcodeScannerApp {
     this.tabButtons.forEach(b => b.addEventListener('click', () => this.switchTab(b.dataset.tab)));
     this.themeToggle.addEventListener('click', () => this.toggleTheme());
 
+    // 掃描器
     this.startBtn.addEventListener('click', () => this.startCamera());
     this.stopBtn.addEventListener('click', () => this.stopCamera());
     this.clearBtn.addEventListener('click', () => this.clearResults());
     this.uploadBtn.addEventListener('click', () => this.fileInput.click());
     this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
 
-    // 重新產生條碼後更新明文列表
     this.generateTestBtn.addEventListener('click', async () => {
       await this.generator.regenerate();
       this.updatePlaintextList();
     });
     this.printTestBtn.addEventListener('click', () => this.generator.printTestPage());
 
+    // 掃描控制
     this.scanModeSelect.addEventListener('change', () => this.updateConfig());
     this.minConfidenceInput.addEventListener('input', () => {
       this.confidenceValue.textContent = this.minConfidenceInput.value;
@@ -164,31 +194,44 @@ class BarcodeScannerApp {
     this.validateCode128Checkbox.addEventListener('change', () => this.updateConfig());
     this.filterDuplicatesCheckbox.addEventListener('change', () => this.updateConfig());
 
-    this.addFilterBtn.addEventListener('click', () => this.addContentFilter());
-    this.contentFilterInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') this.addContentFilter(); });
-
     // 累計結果
     this.copyAccumulatedBtn.addEventListener('click', () => {
-      const text = [...this.accumulatedValues].join('\n');
-      this.copyToClipboard(text);
+      this.copyToClipboard([...this.accumulatedValues].join('\n'));
     });
     this.clearAccumulatedBtn.addEventListener('click', () => {
       this.accumulatedValues.clear();
       this.renderAccumulatedList();
     });
 
-    // 測試頁明文複製
+    // 測試頁明文
     this.copyPlaintextBtn.addEventListener('click', () => {
-      const values = this.getTestBarcodeValues();
-      this.copyToClipboard(values.join('\n'));
+      this.copyToClipboard(this.getTestBarcodeValues().join('\n'));
     });
 
     // 比對
     this.compareBtn.addEventListener('click', () => this.runComparison());
     this.clearCompareBtn.addEventListener('click', () => { this.comparisonResults.innerHTML = ''; });
+
+    // ===== 正則規則 CRUD =====
+    this.addRuleBtn.addEventListener('click', () => this.addRegexRule());
+    this.rulePatternInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') this.addRegexRule(); });
+
+    // ===== AI 產生 =====
+    this.aiToggleBtn.addEventListener('click', () => { this.aiPanel.hidden = !this.aiPanel.hidden; });
+    this.aiPanelCloseBtn.addEventListener('click', () => { this.aiPanel.hidden = true; });
+    this.aiSamples.addEventListener('input', () => this.validateAISamples());
+    this.aiGenerateBtn.addEventListener('click', () => this.generateRegexFromAI());
+    this.aiUseBtn.addEventListener('click', () => this.useAIResult());
+
+    // ===== AI 設定 =====
+    document.getElementById('aiSettingsToggle').addEventListener('click', () => this.toggleAISettings());
+    document.getElementById('saveAiSettings').addEventListener('click', () => this.saveAISettings());
+    this.aiApiFormat.addEventListener('change', () => this.onApiFormatChange());
   }
 
-  // ===== Camera =====
+  // ========================================
+  // Camera
+  // ========================================
 
   async startCamera() {
     try {
@@ -269,13 +312,12 @@ class BarcodeScannerApp {
     image.src = URL.createObjectURL(file);
   }
 
-  // ===== Results =====
+  // ========================================
+  // Results / Live Detect / Accumulated
+  // ========================================
 
   handleResults(filtered, stable) {
-    // 即時辨識 — 顯示當前幀偵測到的
     this.renderLiveDetect(filtered);
-
-    // 累計去重
     let changed = false;
     for (const b of stable) {
       if (!this.accumulatedValues.has(b.rawValue)) {
@@ -284,11 +326,8 @@ class BarcodeScannerApp {
       }
     }
     if (changed) this.renderAccumulatedList();
-
     this.drawBoundingBoxes(stable);
   }
-
-  // ===== Live Detect (即時辨識，固定高度) =====
 
   renderLiveDetect(barcodes) {
     this.liveCount.textContent = barcodes.length + ' 個';
@@ -305,8 +344,6 @@ class BarcodeScannerApp {
     this.liveDetectBox.innerHTML = html;
   }
 
-  // ===== Accumulated List (累計明文) =====
-
   renderAccumulatedList() {
     const vals = [...this.accumulatedValues];
     this.accumulatedCount.textContent = vals.length;
@@ -321,17 +358,16 @@ class BarcodeScannerApp {
     this.accumulatedList.innerHTML = html;
   }
 
-  // ===== Test Page Plaintext =====
+  // ========================================
+  // Test Page / Comparison
+  // ========================================
 
   getTestBarcodeValues() {
     if (!this.generator || !this.generator.barcodes) return [];
     const seen = new Set();
     const result = [];
     for (const b of this.generator.barcodes) {
-      if (!seen.has(b.value)) {
-        seen.add(b.value);
-        result.push(b.value);
-      }
+      if (!seen.has(b.value)) { seen.add(b.value); result.push(b.value); }
     }
     return result;
   }
@@ -343,27 +379,17 @@ class BarcodeScannerApp {
       return;
     }
     let html = '';
-    for (const v of values) {
-      html += `<div class="barcode-plaintext-item">${this.esc(v)}</div>`;
-    }
+    for (const v of values) html += `<div class="barcode-plaintext-item">${this.esc(v)}</div>`;
     this.barcodePlaintextBox.innerHTML = html;
   }
-
-  // ===== Comparison =====
 
   runComparison() {
     const expectedValues = this.getTestBarcodeValues();
     const scannedText = this.scannedInput.value.trim();
-
-    if (expectedValues.length === 0 && !scannedText) {
-      this.handleError(new Error('無條碼可比對'));
-      return;
-    }
+    if (expectedValues.length === 0 && !scannedText) { this.handleError(new Error('無條碼可比對')); return; }
 
     const expected = new Set(expectedValues);
-    const scanned = new Set(
-      scannedText.split('\n').map(s => s.trim()).filter(s => s.length > 0)
-    );
+    const scanned = new Set(scannedText.split('\n').map(s => s.trim()).filter(s => s.length > 0));
 
     const matched = [], missing = [], extra = [];
     for (const v of expected) { (scanned.has(v) ? matched : missing).push(v); }
@@ -376,23 +402,18 @@ class BarcodeScannerApp {
       <div class="rate">${rate}%</div>
       <div class="rate-label">辨識率 (${matched.length}/${expected.size} 匹配)</div>
     </div>`;
-
-    if (matched.length > 0) {
-      html += `<div class="comparison-group"><h4 class="matched">匹配 (${matched.length})</h4>
-        <ul>${matched.map(v => `<li>${this.esc(v)}</li>`).join('')}</ul></div>`;
-    }
-    if (missing.length > 0) {
-      html += `<div class="comparison-group"><h4 class="missing">未辨識 (${missing.length})</h4>
-        <ul>${missing.map(v => `<li>${this.esc(v)}</li>`).join('')}</ul></div>`;
-    }
-    if (extra.length > 0) {
-      html += `<div class="comparison-group"><h4 class="extra">額外辨識 (${extra.length})</h4>
-        <ul>${extra.map(v => `<li>${this.esc(v)}</li>`).join('')}</ul></div>`;
-    }
+    if (matched.length > 0)
+      html += `<div class="comparison-group"><h4 class="matched">匹配 (${matched.length})</h4><ul>${matched.map(v => `<li>${this.esc(v)}</li>`).join('')}</ul></div>`;
+    if (missing.length > 0)
+      html += `<div class="comparison-group"><h4 class="missing">未辨識 (${missing.length})</h4><ul>${missing.map(v => `<li>${this.esc(v)}</li>`).join('')}</ul></div>`;
+    if (extra.length > 0)
+      html += `<div class="comparison-group"><h4 class="extra">額外辨識 (${extra.length})</h4><ul>${extra.map(v => `<li>${this.esc(v)}</li>`).join('')}</ul></div>`;
     this.comparisonResults.innerHTML = html;
   }
 
-  // ===== Bounding Boxes =====
+  // ========================================
+  // Bounding Boxes / Stats / Errors
+  // ========================================
 
   drawBoundingBoxes(barcodes) {
     if (!this.overlayCtx) return;
@@ -434,7 +455,9 @@ class BarcodeScannerApp {
     setTimeout(() => { d.style.opacity='0'; d.style.transition='opacity 0.3s'; setTimeout(()=>d.remove(),300); }, 4000);
   }
 
-  // ===== Config =====
+  // ========================================
+  // Scanner Config
+  // ========================================
 
   updateConfig() {
     this.scanner.updateConfig({
@@ -461,35 +484,313 @@ class BarcodeScannerApp {
     return f;
   }
 
-  addContentFilter() {
-    const v = this.contentFilterInput.value.trim();
-    if (!v) return;
+  // ========================================
+  // 正則規則 CRUD
+  // ========================================
+
+  loadRegexRules() {
     try {
-      const rx = new RegExp(v);
-      this.scanner.filter.addCustomFilter(b => rx.test(b.rawValue));
-      const tag = document.createElement('div');
-      tag.className = 'filter-tag';
-      tag.innerHTML = `<span>${v}</span><button>\u00d7</button>`;
-      tag.querySelector('button').addEventListener('click', () => {
-        this.activeFilters.removeChild(tag);
-        this.rebuildFilters();
-      });
-      this.activeFilters.appendChild(tag);
-      this.contentFilterInput.value = '';
-    } catch(e) { this.handleError(new Error('無效的正則表達式')); }
+      const saved = localStorage.getItem('barcode-regex-rules');
+      this.regexRules = saved ? JSON.parse(saved) : [];
+    } catch (e) { this.regexRules = []; }
+    this.renderRegexRules();
   }
 
-  rebuildFilters() {
-    this.scanner.filter.clearCustomFilters();
-    this.activeFilters.querySelectorAll('.filter-tag span').forEach(s => {
-      try { const rx = new RegExp(s.textContent); this.scanner.filter.addCustomFilter(b => rx.test(b.rawValue)); }
-      catch(e) {}
+  saveRegexRules() {
+    localStorage.setItem('barcode-regex-rules', JSON.stringify(this.regexRules));
+  }
+
+  addRegexRule() {
+    const name = this.ruleNameInput.value.trim();
+    const pattern = this.rulePatternInput.value.trim();
+    if (!pattern) { this.handleError(new Error('請輸入正則表達式')); return; }
+    try { new RegExp(pattern); } catch (e) { this.handleError(new Error('無效的正則表達式: ' + e.message)); return; }
+
+    this.regexRules.push({ id: Date.now(), name: name || pattern, pattern, enabled: true });
+    this.saveRegexRules();
+    this.renderRegexRules();
+    this.rebuildScannerFilters();
+    this.ruleNameInput.value = '';
+    this.rulePatternInput.value = '';
+  }
+
+  deleteRegexRule(id) {
+    this.regexRules = this.regexRules.filter(r => r.id !== id);
+    this.saveRegexRules();
+    this.renderRegexRules();
+    this.rebuildScannerFilters();
+  }
+
+  toggleRegexRule(id) {
+    const rule = this.regexRules.find(r => r.id === id);
+    if (rule) rule.enabled = !rule.enabled;
+    this.saveRegexRules();
+    this.renderRegexRules();
+    this.rebuildScannerFilters();
+  }
+
+  startEditRule(id) {
+    this.editingRuleId = id;
+    this.renderRegexRules();
+    // 自動 focus 正則輸入欄
+    const input = this.regexRulesContainer.querySelector(`[data-id="${id}"] .rule-pattern-input`);
+    if (input) input.focus();
+  }
+
+  saveEditRule(id) {
+    const rule = this.regexRules.find(r => r.id === id);
+    if (!rule) return;
+    const row = this.regexRulesContainer.querySelector(`[data-id="${id}"]`);
+    const nameVal = row.querySelector('.rule-name-input').value.trim();
+    const patternVal = row.querySelector('.rule-pattern-input').value.trim();
+
+    if (!patternVal) { this.handleError(new Error('正則表達式不能為空')); return; }
+    try { new RegExp(patternVal); } catch (e) { this.handleError(new Error('無效的正則表達式')); return; }
+
+    rule.name = nameVal || patternVal;
+    rule.pattern = patternVal;
+    this.editingRuleId = null;
+    this.saveRegexRules();
+    this.renderRegexRules();
+    this.rebuildScannerFilters();
+  }
+
+  cancelEditRule() {
+    this.editingRuleId = null;
+    this.renderRegexRules();
+  }
+
+  renderRegexRules() {
+    if (this.regexRules.length === 0) {
+      this.regexRulesContainer.innerHTML = '<div class="regex-rules-empty">尚無過濾規則</div>';
+      return;
+    }
+
+    let html = '';
+    for (const rule of this.regexRules) {
+      const ck = rule.enabled ? 'checked' : '';
+      const cls = rule.enabled ? '' : ' disabled';
+
+      if (this.editingRuleId === rule.id) {
+        html += `<div class="regex-rule editing" data-id="${rule.id}">
+          <input type="checkbox" ${ck} class="rule-toggle">
+          <input type="text" class="rule-name-input" value="${this.escAttr(rule.name)}">
+          <input type="text" class="rule-pattern-input" value="${this.escAttr(rule.pattern)}">
+          <button class="btn-icon rule-save" title="儲存">&#10003;</button>
+          <button class="btn-icon rule-cancel" title="取消">&#10005;</button>
+        </div>`;
+      } else {
+        html += `<div class="regex-rule${cls}" data-id="${rule.id}">
+          <input type="checkbox" ${ck} class="rule-toggle">
+          <span class="rule-name">${this.esc(rule.name)}</span>
+          <code class="rule-pattern">${this.esc(rule.pattern)}</code>
+          <button class="btn-icon rule-edit" title="編輯">&#9998;</button>
+          <button class="btn-icon rule-delete" title="刪除">&#10005;</button>
+        </div>`;
+      }
+    }
+    this.regexRulesContainer.innerHTML = html;
+
+    // 綁定事件（事件委派到每一行）
+    this.regexRulesContainer.querySelectorAll('.regex-rule').forEach(row => {
+      const id = parseInt(row.dataset.id);
+      const toggle = row.querySelector('.rule-toggle');
+      if (toggle) toggle.addEventListener('change', () => this.toggleRegexRule(id));
+
+      const editBtn = row.querySelector('.rule-edit');
+      if (editBtn) editBtn.addEventListener('click', () => this.startEditRule(id));
+
+      const deleteBtn = row.querySelector('.rule-delete');
+      if (deleteBtn) deleteBtn.addEventListener('click', () => this.deleteRegexRule(id));
+
+      const saveBtn = row.querySelector('.rule-save');
+      if (saveBtn) saveBtn.addEventListener('click', () => this.saveEditRule(id));
+
+      const cancelBtn = row.querySelector('.rule-cancel');
+      if (cancelBtn) cancelBtn.addEventListener('click', () => this.cancelEditRule());
+
+      // Enter 鍵儲存
+      const patternInput = row.querySelector('.rule-pattern-input');
+      if (patternInput) {
+        patternInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') this.saveEditRule(id); });
+        patternInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.cancelEditRule(); });
+      }
     });
   }
 
-  // ===== Utils =====
+  /** 重建掃描器自訂過濾（OR 邏輯：符合任一啟用規則即保留） */
+  rebuildScannerFilters() {
+    if (!this.scanner) return;
+    this.scanner.filter.clearCustomFilters();
+
+    const enabled = this.regexRules.filter(r => r.enabled);
+    if (enabled.length === 0) return; // 無規則 → 全部通過
+
+    const regexes = [];
+    for (const r of enabled) {
+      try { regexes.push(new RegExp(r.pattern)); } catch (e) { /* skip invalid */ }
+    }
+    if (regexes.length === 0) return;
+
+    // 單一 filter function，內部做 OR
+    this.scanner.filter.addCustomFilter(b => regexes.some(rx => rx.test(b.rawValue)));
+  }
+
+  // ========================================
+  // AI 正則產生
+  // ========================================
+
+  validateAISamples() {
+    const lines = this.aiSamples.value.trim().split('\n').filter(l => l.trim());
+    this.aiGenerateBtn.disabled = lines.length < 3;
+  }
+
+  async generateRegexFromAI() {
+    const lines = this.aiSamples.value.trim().split('\n').map(l => l.trim()).filter(l => l).slice(0, 10);
+    if (lines.length < 3) { this.handleError(new Error('至少需要 3 個範例字串')); return; }
+
+    const settings = this.getAISettings();
+    if (!settings.url) { this.handleError(new Error('請先在「AI 設定」填入 API 路徑')); return; }
+    if (!settings.model) { this.handleError(new Error('請先在「AI 設定」填入模型名稱')); return; }
+
+    const prompt = `Based on the following ${lines.length} example strings, generate a single regular expression that matches all of them. Return ONLY the regex pattern string, nothing else. No explanation, no markdown, no code block, just the raw pattern.\n\nExample strings:\n${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}`;
+
+    this.aiGenerateBtn.disabled = true;
+    this.aiStatus.textContent = '產生中...';
+    this.aiResult.hidden = true;
+
+    try {
+      const result = await this.callAI(prompt, settings);
+      // 清理 AI 回傳：移除 /.../ 包裝、移除 markdown code block
+      let pattern = result.trim()
+        .replace(/^```[^\n]*\n?/, '').replace(/\n?```$/, '')
+        .replace(/^\/(.+)\/[gimsuvy]*$/, '$1')
+        .trim();
+
+      try { new RegExp(pattern); } catch (e) {
+        throw new Error('AI 回傳的正則式無效: ' + pattern);
+      }
+
+      this.aiResultPattern.value = pattern;
+      this.aiResult.hidden = false;
+      this.aiStatus.textContent = '';
+    } catch (e) {
+      this.aiStatus.textContent = '';
+      this.handleError(new Error('AI 產生失敗: ' + e.message));
+    } finally {
+      this.validateAISamples();
+    }
+  }
+
+  useAIResult() {
+    const pattern = this.aiResultPattern.value;
+    if (!pattern) return;
+    this.rulePatternInput.value = pattern;
+    this.aiPanel.hidden = true;
+    this.ruleNameInput.focus();
+  }
+
+  async callAI(prompt, settings) {
+    const { format, url, token, model } = settings;
+    let headers = { 'Content-Type': 'application/json' };
+    let body;
+
+    if (format === 'anthropic') {
+      headers['x-api-key'] = token;
+      headers['anthropic-version'] = '2023-06-01';
+      body = JSON.stringify({
+        model, max_tokens: 200,
+        messages: [{ role: 'user', content: prompt }]
+      });
+    } else if (format === 'ollama') {
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      body = JSON.stringify({
+        model, stream: false,
+        messages: [{ role: 'user', content: prompt }]
+      });
+    } else {
+      // openai 相容
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      body = JSON.stringify({
+        model, max_tokens: 200,
+        messages: [{ role: 'user', content: prompt }]
+      });
+    }
+
+    const resp = await fetch(url, { method: 'POST', headers, body });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      throw new Error(`API ${resp.status}: ${text.substring(0, 200)}`);
+    }
+
+    const data = await resp.json();
+
+    if (format === 'anthropic') return data.content?.[0]?.text || '';
+    if (format === 'ollama') return data.message?.content || '';
+    return data.choices?.[0]?.message?.content || '';
+  }
+
+  // ========================================
+  // AI 設定
+  // ========================================
+
+  loadAISettings() {
+    try {
+      const saved = localStorage.getItem('barcode-ai-settings');
+      if (saved) {
+        const s = JSON.parse(saved);
+        this.aiApiFormat.value = s.format || 'ollama';
+        this.aiApiUrl.value = s.url || '';
+        this.aiApiToken.value = s.token || '';
+        this.aiModel.value = s.model || '';
+      }
+    } catch (e) {}
+    this.onApiFormatChange();
+  }
+
+  getAISettings() {
+    return {
+      format: this.aiApiFormat.value,
+      url: this.aiApiUrl.value.trim(),
+      token: this.aiApiToken.value.trim(),
+      model: this.aiModel.value.trim()
+    };
+  }
+
+  saveAISettings() {
+    localStorage.setItem('barcode-ai-settings', JSON.stringify(this.getAISettings()));
+    this.showToast('AI 設定已儲存');
+  }
+
+  onApiFormatChange() {
+    const defaults = {
+      openai: 'https://api.openai.com/v1/chat/completions',
+      ollama: 'https://ollama.com/api/chat',
+      anthropic: 'https://api.anthropic.com/v1/messages'
+    };
+    const current = this.aiApiUrl.value.trim();
+    const isDefault = !current || Object.values(defaults).includes(current);
+    if (isDefault) this.aiApiUrl.value = defaults[this.aiApiFormat.value] || '';
+
+    // Anthropic CORS 警告
+    if (this.anthropicWarning) {
+      this.anthropicWarning.hidden = this.aiApiFormat.value !== 'anthropic';
+    }
+  }
+
+  toggleAISettings() {
+    const content = document.getElementById('aiSettingsContent');
+    const arrow = document.querySelector('#aiSettingsToggle .collapse-arrow');
+    content.hidden = !content.hidden;
+    arrow.innerHTML = content.hidden ? '&#9654;' : '&#9660;';
+  }
+
+  // ========================================
+  // Utils
+  // ========================================
 
   esc(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+  escAttr(str) { return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   async copyToClipboard(text) {
     try { await navigator.clipboard.writeText(text); }
