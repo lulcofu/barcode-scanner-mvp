@@ -20,6 +20,7 @@ class BarcodeScannerCore {
       // 辨識增強
       enableRotation: config.enableRotation || false,
       enableEnhancement: config.enableEnhancement || false,
+      enable1DEnhanced: config.enable1DEnhanced || false,
       rotationAngles: config.rotationAngles || [-10, -5, 5, 10],
 
       // 條碼類型白名單
@@ -77,7 +78,7 @@ class BarcodeScannerCore {
     
     // 初始化 ZXing（不在 ZXing 層限制格式，由 BarcodeDataFilter 過濾）
     try {
-      this.codeReader = new ZXing.BrowserMultiFormatReader();
+      this.initCodeReader();
       console.log('[Scanner] ZXing-js 初始化成功');
     } catch (e) {
       console.error('[Scanner] ZXing-js 初始化失敗:', e);
@@ -98,6 +99,23 @@ class BarcodeScannerCore {
     console.log('[Scanner] 初始化完成');
     console.log('[Scanner] 金字塔尺度:', this.config.pyramidScales);
     console.log('[Scanner] 最小信心度:', this.config.minConfidence);
+  }
+
+  /**
+   * 建立/重建 ZXing 解碼器
+   * 1D 強化模式啟用 TRY_HARDER hint
+   */
+  initCodeReader() {
+    if (this.config.enable1DEnhanced) {
+      const hints = new Map();
+      const TRY_HARDER = (typeof ZXing !== 'undefined' && ZXing.DecodeHintType)
+        ? ZXing.DecodeHintType.TRY_HARDER : 4;
+      hints.set(TRY_HARDER, true);
+      this.codeReader = new ZXing.BrowserMultiFormatReader(hints);
+      console.log('[Scanner] 1D 強化模式：TRY_HARDER 已啟用');
+    } else {
+      this.codeReader = new ZXing.BrowserMultiFormatReader();
+    }
   }
   
   /**
@@ -349,6 +367,34 @@ class BarcodeScannerCore {
   }
   
   /**
+   * 1D 強化：水平掃描帶
+   * 將影像切成多條水平帶，分別嘗試解碼，提升 Code-128/ITF 辨識率
+   */
+  scan1DStrips(canvas) {
+    const results = [];
+    const stripCount = 5;
+    const stripHeight = Math.max(30, Math.floor(canvas.height * 0.15));
+
+    for (let i = 0; i < stripCount; i++) {
+      const y = Math.floor((canvas.height - stripHeight) * i / (stripCount - 1));
+
+      const strip = document.createElement('canvas');
+      strip.width = canvas.width;
+      strip.height = stripHeight;
+      const ctx = strip.getContext('2d');
+      ctx.drawImage(canvas, 0, y, canvas.width, stripHeight, 0, 0, canvas.width, stripHeight);
+
+      const result = this.tryZXingDecode(strip);
+      if (result) {
+        if (result.boundingBox) result.boundingBox.y += y;
+        const exists = results.some(r => r.format === result.format && r.rawValue === result.rawValue);
+        if (!exists) results.push(result);
+      }
+    }
+    return results;
+  }
+
+  /**
    * 使用 ZXing 偵測條碼（支援多角度旋轉）
    */
   async detectBarcodes(canvas) {
@@ -358,6 +404,15 @@ class BarcodeScannerCore {
       // 原始方向解碼
       const baseResult = this.tryZXingDecode(canvas);
       if (baseResult) results.push(baseResult);
+
+      // 1D 強化：水平掃描帶
+      if (this.config.enable1DEnhanced) {
+        const stripResults = this.scan1DStrips(canvas);
+        for (const r of stripResults) {
+          const exists = results.some(e => e.format === r.format && e.rawValue === r.rawValue);
+          if (!exists) results.push(r);
+        }
+      }
 
       // 多角度旋轉掃描
       if (this.config.enableRotation) {
@@ -640,9 +695,15 @@ class BarcodeScannerCore {
    * 更新設定
    */
   updateConfig(newConfig) {
+    const prev1D = this.config.enable1DEnhanced;
     Object.assign(this.config, newConfig);
     this.accumulator.config.minConfidence = this.config.minConfidence;
     this.accumulator.config.maxAge = this.config.maxAge;
+
+    // 1D 強化設定變更時重建解碼器（切換 TRY_HARDER）
+    if (newConfig.enable1DEnhanced !== undefined && newConfig.enable1DEnhanced !== prev1D) {
+      this.initCodeReader();
+    }
 
     console.log('[Scanner] 設定已更新:', newConfig);
   }

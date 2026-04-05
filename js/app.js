@@ -54,6 +54,7 @@ class BarcodeScannerApp {
     this.confidenceValue = document.getElementById('confidenceValue');
     this.pyramidScalesInput = document.getElementById('pyramidScales');
     this.formatCheckboxes = document.querySelectorAll('.control-panel .checkbox-group input[type="checkbox"]');
+    this.enable1DEnhancedCheckbox = document.getElementById('enable1DEnhanced');
     this.enableRotationCheckbox = document.getElementById('enableRotation');
     this.enableEnhancementCheckbox = document.getElementById('enableEnhancement');
 
@@ -146,6 +147,7 @@ class BarcodeScannerApp {
       minConfidence: parseInt(this.minConfidenceInput.value),
       pyramidScales: this.parsePyramidScales(),
       allowedFormats: this.getAllowedFormats(),
+      enable1DEnhanced: this.enable1DEnhancedCheckbox.checked,
       enableRotation: this.enableRotationCheckbox.checked,
       enableEnhancement: this.enableEnhancementCheckbox.checked,
       validateEAN: this.validateEANCheckbox.checked,
@@ -221,6 +223,7 @@ class BarcodeScannerApp {
     });
     this.pyramidScalesInput.addEventListener('change', () => this.updateConfig());
     this.formatCheckboxes.forEach(cb => cb.addEventListener('change', () => this.updateConfig()));
+    this.enable1DEnhancedCheckbox.addEventListener('change', () => this.updateConfig());
     this.enableRotationCheckbox.addEventListener('change', () => this.updateConfig());
     this.enableEnhancementCheckbox.addEventListener('change', () => this.updateConfig());
     this.validateEANCheckbox.addEventListener('change', () => this.updateConfig());
@@ -499,6 +502,7 @@ class BarcodeScannerApp {
       minConfidence: parseInt(this.minConfidenceInput.value),
       pyramidScales: this.parsePyramidScales(),
       allowedFormats: this.getAllowedFormats(),
+      enable1DEnhanced: this.enable1DEnhancedCheckbox.checked,
       enableRotation: this.enableRotationCheckbox.checked,
       enableEnhancement: this.enableEnhancementCheckbox.checked,
       validateEAN: this.validateEANCheckbox.checked,
