@@ -41,6 +41,14 @@
 
       <div class="control-panel">
         <div class="control-group">
+          <label>解碼引擎：</label>
+          <select id="decoderEngine">
+            <option value="auto">自動（雙引擎）</option>
+            <option value="zxing">ZXing-js</option>
+            <option value="native">原生 BarcodeDetector</option>
+          </select>
+        </div>
+        <div class="control-group">
           <label>掃描模式：</label>
           <select id="scanMode">
             <option value="pyramid">金字塔掃描（推薦）</option>

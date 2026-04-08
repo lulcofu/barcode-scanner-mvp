@@ -49,6 +49,7 @@ class BarcodeScannerApp {
     this.fileInput = document.getElementById('fileInput');
 
     // 控制項
+    this.decoderEngineSelect = document.getElementById('decoderEngine');
     this.scanModeSelect = document.getElementById('scanMode');
     this.minConfidenceInput = document.getElementById('minConfidence');
     this.confidenceValue = document.getElementById('confidenceValue');
@@ -143,6 +144,7 @@ class BarcodeScannerApp {
     this.loadAISettings();
 
     this.scanner = new BarcodeScannerCore({
+      decoderEngine: this.decoderEngineSelect.value,
       scanMode: this.scanModeSelect.value,
       minConfidence: parseInt(this.minConfidenceInput.value),
       pyramidScales: this.parsePyramidScales(),
@@ -216,6 +218,7 @@ class BarcodeScannerApp {
     this.printTestBtn.addEventListener('click', () => this.generator.printTestPage());
 
     // 掃描控制
+    this.decoderEngineSelect.addEventListener('change', () => this.updateConfig());
     this.scanModeSelect.addEventListener('change', () => this.updateConfig());
     this.minConfidenceInput.addEventListener('input', () => {
       this.confidenceValue.textContent = this.minConfidenceInput.value;
@@ -498,6 +501,7 @@ class BarcodeScannerApp {
 
   updateConfig() {
     this.scanner.updateConfig({
+      decoderEngine: this.decoderEngineSelect.value,
       scanMode: this.scanModeSelect.value,
       minConfidence: parseInt(this.minConfidenceInput.value),
       pyramidScales: this.parsePyramidScales(),
