@@ -133,9 +133,8 @@ class BarcodeScannerApp {
     // 累計去重條碼
     this.accumulatedValues = new Set();
 
-    // Overlay 渲染
+    // Overlay 資料
     this._overlayBarcodes = [];
-    this._overlayRunning = false;
 
     // 正則規則
     this.regexRules = [];
@@ -298,13 +297,22 @@ class BarcodeScannerApp {
       this.stream = stream;
       this.video.srcObject = stream;
       await this.video.play();
-      this.overlay.width = this.video.videoWidth || 1920;
-      this.overlay.height = this.video.videoHeight || 1080;
+
+      // 確保影像尺寸就緒
+      if (!this.video.videoWidth) {
+        await new Promise(r => this.video.addEventListener('loadedmetadata', r, { once: true }));
+      }
+
+      // 動態調整容器比例以匹配實際相機解析度
+      const wrapper = this.video.closest('.video-wrapper');
+      if (wrapper) wrapper.style.aspectRatio = `${this.video.videoWidth} / ${this.video.videoHeight}`;
+
+      this.overlay.width = this.video.videoWidth;
+      this.overlay.height = this.video.videoHeight;
       this.overlayCtx = this.overlay.getContext('2d');
 
       await this.scanner.initialize(this.video);
       await this.scanner.startScanning();
-      this.startOverlayLoop();
       this.stopBtn.disabled = false;
       this.startBtn.disabled = false;
     } catch (e) {
@@ -329,7 +337,6 @@ class BarcodeScannerApp {
 
   stopCamera() {
     this.scanner.stopScanning();
-    this.stopOverlayLoop();
     if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
     this.video.srcObject = null;
     this.stopBtn.disabled = true;
@@ -372,8 +379,9 @@ class BarcodeScannerApp {
       }
     }
     if (changed) this.renderAccumulatedList();
-    // 更新 overlay 資料，由獨立 rAF 迴圈繪製
-    this._overlayBarcodes = stable;
+    // 使用當前幀結果繪製框線（位置最即時）
+    this._overlayBarcodes = filtered;
+    this.drawBoundingBoxes(filtered);
   }
 
   renderLiveDetect(barcodes) {
@@ -462,53 +470,13 @@ class BarcodeScannerApp {
   // Bounding Boxes / Stats / Errors
   // ========================================
 
-  /**
-   * 啟動獨立 overlay 渲染迴圈（60fps 重繪框線，不受掃描速度影響）
-   */
-  startOverlayLoop() {
-    this._overlayRunning = true;
-    const loop = () => {
-      if (!this._overlayRunning) return;
-      this.drawBoundingBoxes(this._overlayBarcodes);
-      requestAnimationFrame(loop);
-    };
-    requestAnimationFrame(loop);
-  }
-
-  stopOverlayLoop() {
-    this._overlayRunning = false;
-    this._overlayBarcodes = [];
-  }
-
   drawBoundingBoxes(barcodes) {
     if (!this.overlayCtx) return;
-    const vw = this.video.videoWidth || 1;
-    const vh = this.video.videoHeight || 1;
     const cw = this.overlay.width;
     const ch = this.overlay.height;
     this.overlayCtx.clearRect(0, 0, cw, ch);
 
-    // 計算 object-fit: contain 的實際繪製區域（與 video 對齊）
-    const videoAspect = vw / vh;
-    const canvasAspect = cw / ch;
-    let drawW, drawH, offsetX, offsetY;
-    if (videoAspect > canvasAspect) {
-      // 影像較寬 → 左右填滿，上下留黑邊
-      drawW = cw;
-      drawH = cw / videoAspect;
-      offsetX = 0;
-      offsetY = (ch - drawH) / 2;
-    } else {
-      // 影像較高 → 上下填滿，左右留黑邊
-      drawH = ch;
-      drawW = ch * videoAspect;
-      offsetX = (cw - drawW) / 2;
-      offsetY = 0;
-    }
-
-    const sx = drawW / vw;
-    const sy = drawH / vh;
-
+    // overlay 解析度 = video 解析度，容器比例已動態匹配 → 直接繪製
     const colors = {
       'ean_13':'#6b8f71','ean_8':'#5b8fa8','code_128':'#9b7ab8','code_39':'#c08040',
       'qr_code':'#4ab0a0','data_matrix':'#a05050','pdf_417':'#b89860','itf':'#7a7a7a'
@@ -516,17 +484,17 @@ class BarcodeScannerApp {
     for (const b of barcodes) {
       if (!b.boundingBox) continue;
       const bx = b.boundingBox;
-      const x = offsetX + bx.x * sx;
-      const y = offsetY + bx.y * sy;
-      const w = bx.width * sx;
-      const h = bx.height * sy;
+      const x = bx.x, y = bx.y, w = bx.width, h = bx.height;
+      // 1D 條碼的 resultPoints 高度可能極小，設最小框高
+      const drawH = Math.max(h, 20);
+      const drawY = h < 20 ? y - 10 : y;
       const c = colors[b.format] || '#5b8fa8';
       this.overlayCtx.strokeStyle = c; this.overlayCtx.lineWidth = 3;
-      this.overlayCtx.strokeRect(x, y, w, h);
+      this.overlayCtx.strokeRect(x, drawY, w, drawH);
       this.overlayCtx.fillStyle = c; this.overlayCtx.font = 'bold 13px Arial';
       const lbl = b.format.replace('_','-').toUpperCase();
-      this.overlayCtx.fillRect(x, y-18, this.overlayCtx.measureText(lbl).width+8, 18);
-      this.overlayCtx.fillStyle = '#fff'; this.overlayCtx.fillText(lbl, x+4, y-4);
+      this.overlayCtx.fillRect(x, drawY-18, this.overlayCtx.measureText(lbl).width+8, 18);
+      this.overlayCtx.fillStyle = '#fff'; this.overlayCtx.fillText(lbl, x+4, drawY-4);
     }
   }
 

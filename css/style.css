@@ -176,7 +176,7 @@ input[type="range"] { width: 100%; height: 5px; cursor: pointer; accent-color: v
   border-radius: 8px; overflow: hidden; aspect-ratio: 16/9;
 }
 .video-wrapper video { width: 100%; height: 100%; object-fit: contain; background: #000; }
-.video-wrapper canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.video-wrapper canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 .scan-indicator {
   position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6);
   color: white; padding: 4px 12px; border-radius: 16px; font-size: 0.8rem;

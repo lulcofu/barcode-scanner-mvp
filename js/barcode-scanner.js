@@ -8,7 +8,7 @@ class BarcodeScannerCore {
     this.config = {
       // 影像設定
       targetResolution: config.targetResolution || 1280,
-      scanInterval: config.scanInterval || 150,
+      scanInterval: config.scanInterval || 100,
       
       // 金字塔掃描
       pyramidScales: config.pyramidScales || [1.0, 0.6, 0.35],
@@ -67,6 +67,18 @@ class BarcodeScannerCore {
       framesSinceLastFps: 0
     };
     
+    // 可重用畫布（避免每幀反覆建立 / GC 壓力）
+    this._scanCanvas = document.createElement('canvas');
+    this._scanCtx = this._scanCanvas.getContext('2d');
+    this._workCanvas = document.createElement('canvas');
+    this._workCtx = this._workCanvas.getContext('2d');
+    this._stripCanvas = document.createElement('canvas');
+    this._stripCtx = this._stripCanvas.getContext('2d');
+    this._rotCanvas = document.createElement('canvas');
+    this._rotCtx = this._rotCanvas.getContext('2d');
+    this._enhCanvas = document.createElement('canvas');
+    this._enhCtx = this._enhCanvas.getContext('2d');
+
     // 回調
     this.onResults = null;
     this.onStats = null;
@@ -258,9 +270,9 @@ class BarcodeScannerCore {
     this.stats.frameCount = this.frameCount;
     
     try {
-      // 建立畫布
-      let canvas = document.createElement('canvas');
-      let ctx = canvas.getContext('2d');
+      // 重用畫布
+      let canvas = this._scanCanvas;
+      let ctx = this._scanCtx;
 
       // 設定解析度
       const scale = Math.min(1, this.config.targetResolution / Math.max(
@@ -350,14 +362,11 @@ class BarcodeScannerCore {
 
     for (const scale of this.config.pyramidScales) {
       try {
-        // 縮放影像
-        const scaledCanvas = document.createElement('canvas');
-        const scaledCtx = scaledCanvas.getContext('2d');
-
-        scaledCanvas.width = canvas.width * scale;
-        scaledCanvas.height = canvas.height * scale;
-
-        scaledCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+        // 縮放影像（重用畫布）
+        this._workCanvas.width = canvas.width * scale;
+        this._workCanvas.height = canvas.height * scale;
+        this._workCtx.drawImage(canvas, 0, 0, this._workCanvas.width, this._workCanvas.height);
+        const scaledCanvas = this._workCanvas;
 
         // 第一個尺度：完整偵測（含 1D 掃描帶 + 旋轉）
         // 其餘尺度：僅基本解碼（大幅降低解碼次數）
@@ -398,13 +407,11 @@ class BarcodeScannerCore {
     for (let row = 0; row < gridSize; row++) {
       for (let col = 0; col < gridSize; col++) {
         try {
-          const roiCanvas = document.createElement('canvas');
-          const roiCtx = roiCanvas.getContext('2d');
+          this._workCanvas.width = cellWidth;
+          this._workCanvas.height = cellHeight;
+          const roiCanvas = this._workCanvas;
 
-          roiCanvas.width = cellWidth;
-          roiCanvas.height = cellHeight;
-
-          roiCtx.drawImage(
+          this._workCtx.drawImage(
             canvas,
             col * cellWidth, row * cellHeight,
             cellWidth, cellHeight,
@@ -453,13 +460,11 @@ class BarcodeScannerCore {
     for (let i = 0; i < stripCount; i++) {
       const y = Math.floor((canvas.height - stripHeight) * i / (stripCount - 1));
 
-      const strip = document.createElement('canvas');
-      strip.width = canvas.width;
-      strip.height = stripHeight;
-      const ctx = strip.getContext('2d');
-      ctx.drawImage(canvas, 0, y, canvas.width, stripHeight, 0, 0, canvas.width, stripHeight);
+      this._stripCanvas.width = canvas.width;
+      this._stripCanvas.height = stripHeight;
+      this._stripCtx.drawImage(canvas, 0, y, canvas.width, stripHeight, 0, 0, canvas.width, stripHeight);
 
-      const stripResults = await this.decodeCanvas(strip);
+      const stripResults = await this.decodeCanvas(this._stripCanvas);
       for (const r of stripResults) {
         if (r.boundingBox) r.boundingBox.y += y;
         const exists = results.some(e => e.format === r.format && e.rawValue === r.rawValue);
@@ -539,10 +544,10 @@ class BarcodeScannerCore {
     const newW = Math.ceil(w * cos + h * sin);
     const newH = Math.ceil(w * sin + h * cos);
 
-    const rotated = document.createElement('canvas');
-    rotated.width = newW;
-    rotated.height = newH;
-    const ctx = rotated.getContext('2d');
+    this._rotCanvas.width = newW;
+    this._rotCanvas.height = newH;
+    const rotated = this._rotCanvas;
+    const ctx = this._rotCtx;
 
     ctx.translate(newW / 2, newH / 2);
     ctx.rotate(rad);
@@ -556,10 +561,10 @@ class BarcodeScannerCore {
    */
   enhanceImage(canvas) {
     const w = canvas.width, h = canvas.height;
-    const enhanced = document.createElement('canvas');
-    enhanced.width = w;
-    enhanced.height = h;
-    const ctx = enhanced.getContext('2d');
+    this._enhCanvas.width = w;
+    this._enhCanvas.height = h;
+    const enhanced = this._enhCanvas;
+    const ctx = this._enhCtx;
 
     // 灰階 + 對比度（優先使用 canvas filter，GPU 加速）
     try {
@@ -784,6 +789,8 @@ class MultiFrameAccumulator {
         existing.confidence++;
         existing.lastSeen = now;
         existing.positions.push(result.boundingBox);
+        // 更新至最新位置（框線追蹤條碼移動）
+        if (result.boundingBox) existing.boundingBox = result.boundingBox;
       } else {
         this.detectedCodes.set(key, {
           ...result,
