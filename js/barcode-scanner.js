@@ -51,6 +51,7 @@ class BarcodeScannerCore {
     
     // 狀態
     this.isScanning = false;
+    this._scanBusy = false;
     this.videoElement = null;
     this.codeReader = null;
     this.lastScanTime = 0;
@@ -218,31 +219,32 @@ class BarcodeScannerCore {
   }
   
   /**
-   * 掃描迴圈
+   * 掃描迴圈（非阻塞：不等待 scanFrame 完成，rAF 持續運轉）
    */
-  async scanLoop() {
+  scanLoop() {
     if (!this.isScanning || !this.videoElement) return;
-    
+
     const now = Date.now();
-    const elapsed = now - this.lastScanTime;
-    
-    if (elapsed >= this.config.scanInterval) {
+
+    // 發起掃描（非阻塞，上一次未完成就跳過）
+    if (!this._scanBusy && now - this.lastScanTime >= this.config.scanInterval) {
       this.lastScanTime = now;
-      await this.scanFrame();
+      this._scanBusy = true;
+      this.scanFrame().finally(() => { this._scanBusy = false; });
     }
-    
+
     // 更新 FPS
     this.stats.framesSinceLastFps++;
     if (now - this.stats.lastFpsTime >= 1000) {
       this.stats.fps = this.stats.framesSinceLastFps;
       this.stats.framesSinceLastFps = 0;
       this.stats.lastFpsTime = now;
-      
+
       if (this.onStats) {
         this.onStats(this.stats);
       }
     }
-    
+
     requestAnimationFrame(() => this.scanLoop());
   }
   
@@ -335,21 +337,26 @@ class BarcodeScannerCore {
    */
   async pyramidScan(canvas, ctx) {
     const allResults = [];
-    
+    let isFirst = true;
+
     for (const scale of this.config.pyramidScales) {
       try {
         // 縮放影像
         const scaledCanvas = document.createElement('canvas');
         const scaledCtx = scaledCanvas.getContext('2d');
-        
+
         scaledCanvas.width = canvas.width * scale;
         scaledCanvas.height = canvas.height * scale;
-        
+
         scaledCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
-        
-        // 偵測條碼
-        const results = await this.detectBarcodes(scaledCanvas);
-        
+
+        // 第一個尺度：完整偵測（含 1D 掃描帶 + 旋轉）
+        // 其餘尺度：僅基本解碼（大幅降低解碼次數）
+        const results = isFirst
+          ? await this.detectBarcodes(scaledCanvas)
+          : await this.decodeCanvas(scaledCanvas);
+        isFirst = false;
+
         // 座標映射回原始尺寸
         for (const result of results) {
           const mapped = {
@@ -359,12 +366,12 @@ class BarcodeScannerCore {
           };
           allResults.push(mapped);
         }
-        
+
       } catch (e) {
         console.warn(`[Scanner] 金字塔尺度 ${scale} 掃描失敗:`, e);
       }
     }
-    
+
     // 去重
     return this.deduplicateResults(allResults);
   }
@@ -378,18 +385,16 @@ class BarcodeScannerCore {
     const gridSize = 3;
     const cellWidth = canvas.width / gridSize;
     const cellHeight = canvas.height / gridSize;
-    
+
     for (let row = 0; row < gridSize; row++) {
       for (let col = 0; col < gridSize; col++) {
         try {
-          // 建立區域畫布
           const roiCanvas = document.createElement('canvas');
           const roiCtx = roiCanvas.getContext('2d');
-          
+
           roiCanvas.width = cellWidth;
           roiCanvas.height = cellHeight;
-          
-          // 裁切區域
+
           roiCtx.drawImage(
             canvas,
             col * cellWidth, row * cellHeight,
@@ -397,11 +402,10 @@ class BarcodeScannerCore {
             0, 0,
             cellWidth, cellHeight
           );
-          
-          // 偵測
-          const results = await this.detectBarcodes(roiCanvas);
-          
-          // 座標映射
+
+          // 各區域僅基本解碼（避免 9 格 × 完整偵測爆炸）
+          const results = await this.decodeCanvas(roiCanvas);
+
           for (const result of results) {
             const mapped = {
               ...result,
@@ -414,17 +418,17 @@ class BarcodeScannerCore {
             };
             allResults.push(mapped);
           }
-          
+
         } catch (e) {
           // 忽略單一區域錯誤
         }
       }
     }
-    
-    // 加上全圖掃描
+
+    // 全圖完整偵測（含 1D 掃描帶 + 旋轉）
     const fullResults = await this.detectBarcodes(canvas);
     allResults.push(...fullResults);
-    
+
     return this.deduplicateResults(allResults);
   }
   

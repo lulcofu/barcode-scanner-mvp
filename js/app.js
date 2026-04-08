@@ -133,6 +133,10 @@ class BarcodeScannerApp {
     // 累計去重條碼
     this.accumulatedValues = new Set();
 
+    // Overlay 渲染
+    this._overlayBarcodes = [];
+    this._overlayRunning = false;
+
     // 正則規則
     this.regexRules = [];
     this.editingRuleId = null;
@@ -300,6 +304,7 @@ class BarcodeScannerApp {
 
       await this.scanner.initialize(this.video);
       await this.scanner.startScanning();
+      this.startOverlayLoop();
       this.stopBtn.disabled = false;
       this.startBtn.disabled = false;
     } catch (e) {
@@ -324,6 +329,7 @@ class BarcodeScannerApp {
 
   stopCamera() {
     this.scanner.stopScanning();
+    this.stopOverlayLoop();
     if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
     this.video.srcObject = null;
     this.stopBtn.disabled = true;
@@ -334,6 +340,7 @@ class BarcodeScannerApp {
   clearResults() {
     this.scanner.clearResults();
     this.accumulatedValues.clear();
+    this._overlayBarcodes = [];
     this.renderAccumulatedList();
     this.renderLiveDetect([]);
     if (this.overlayCtx) this.overlayCtx.clearRect(0, 0, this.overlay.width, this.overlay.height);
@@ -365,7 +372,8 @@ class BarcodeScannerApp {
       }
     }
     if (changed) this.renderAccumulatedList();
-    this.drawBoundingBoxes(stable);
+    // 更新 overlay 資料，由獨立 rAF 迴圈繪製
+    this._overlayBarcodes = stable;
   }
 
   renderLiveDetect(barcodes) {
@@ -453,6 +461,24 @@ class BarcodeScannerApp {
   // ========================================
   // Bounding Boxes / Stats / Errors
   // ========================================
+
+  /**
+   * 啟動獨立 overlay 渲染迴圈（60fps 重繪框線，不受掃描速度影響）
+   */
+  startOverlayLoop() {
+    this._overlayRunning = true;
+    const loop = () => {
+      if (!this._overlayRunning) return;
+      this.drawBoundingBoxes(this._overlayBarcodes);
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+
+  stopOverlayLoop() {
+    this._overlayRunning = false;
+    this._overlayBarcodes = [];
+  }
 
   drawBoundingBoxes(barcodes) {
     if (!this.overlayCtx) return;
