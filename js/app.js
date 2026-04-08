@@ -482,9 +482,33 @@ class BarcodeScannerApp {
 
   drawBoundingBoxes(barcodes) {
     if (!this.overlayCtx) return;
-    this.overlayCtx.clearRect(0, 0, this.overlay.width, this.overlay.height);
-    const sx = this.overlay.width / this.video.videoWidth;
-    const sy = this.overlay.height / this.video.videoHeight;
+    const vw = this.video.videoWidth || 1;
+    const vh = this.video.videoHeight || 1;
+    const cw = this.overlay.width;
+    const ch = this.overlay.height;
+    this.overlayCtx.clearRect(0, 0, cw, ch);
+
+    // 計算 object-fit: contain 的實際繪製區域（與 video 對齊）
+    const videoAspect = vw / vh;
+    const canvasAspect = cw / ch;
+    let drawW, drawH, offsetX, offsetY;
+    if (videoAspect > canvasAspect) {
+      // 影像較寬 → 左右填滿，上下留黑邊
+      drawW = cw;
+      drawH = cw / videoAspect;
+      offsetX = 0;
+      offsetY = (ch - drawH) / 2;
+    } else {
+      // 影像較高 → 上下填滿，左右留黑邊
+      drawH = ch;
+      drawW = ch * videoAspect;
+      offsetX = (cw - drawW) / 2;
+      offsetY = 0;
+    }
+
+    const sx = drawW / vw;
+    const sy = drawH / vh;
+
     const colors = {
       'ean_13':'#6b8f71','ean_8':'#5b8fa8','code_128':'#9b7ab8','code_39':'#c08040',
       'qr_code':'#4ab0a0','data_matrix':'#a05050','pdf_417':'#b89860','itf':'#7a7a7a'
@@ -492,7 +516,10 @@ class BarcodeScannerApp {
     for (const b of barcodes) {
       if (!b.boundingBox) continue;
       const bx = b.boundingBox;
-      const x = bx.x*sx, y = bx.y*sy, w = bx.width*sx, h = bx.height*sy;
+      const x = offsetX + bx.x * sx;
+      const y = offsetY + bx.y * sy;
+      const w = bx.width * sx;
+      const h = bx.height * sy;
       const c = colors[b.format] || '#5b8fa8';
       this.overlayCtx.strokeStyle = c; this.overlayCtx.lineWidth = 3;
       this.overlayCtx.strokeRect(x, y, w, h);

@@ -281,7 +281,7 @@ class BarcodeScannerCore {
 
       // 根據掃描模式選擇方法
       let results = [];
-      
+
       switch (this.config.scanMode) {
         case 'pyramid':
           results = await this.pyramidScan(canvas, ctx);
@@ -293,6 +293,15 @@ class BarcodeScannerCore {
         default:
           results = await this.singleScan(canvas, ctx);
           break;
+      }
+
+      // 座標映射：掃描畫布空間 → 原始影像空間
+      if (scale < 1) {
+        for (const r of results) {
+          if (r.boundingBox) {
+            r.boundingBox = this.scaleBoundingBox(r.boundingBox, 1 / scale);
+          }
+        }
       }
       
       // 加入累積器
