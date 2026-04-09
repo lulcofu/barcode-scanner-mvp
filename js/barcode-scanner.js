@@ -79,6 +79,11 @@ class BarcodeScannerCore {
     this._enhCanvas = document.createElement('canvas');
     this._enhCtx = this._enhCanvas.getContext('2d');
 
+    // Polyfill（barcode-detector，底層 zxing-wasm）
+    this._polyfillClass = null;
+    this._polyfillLoading = false;
+    this.polyfillDetector = null;
+
     // 回調
     this.onResults = null;
     this.onStats = null;
@@ -111,6 +116,11 @@ class BarcodeScannerCore {
       }
     }
     this.initNativeDetector();
+
+    // Polyfill（延遲載入 WASM，選擇此引擎時才下載）
+    if (this.config.decoderEngine === 'polyfill') {
+      await this.initPolyfillDetector();
+    }
 
     console.log('[Scanner] 初始化完成，解碼引擎:', this.config.decoderEngine);
     console.log('[Scanner] 金字塔尺度:', this.config.pyramidScales);
@@ -145,6 +155,34 @@ class BarcodeScannerCore {
       console.log('[Scanner] 原生 BarcodeDetector 已建立');
     } catch (e) {
       console.warn('[Scanner] BarcodeDetector 建立失敗:', e);
+    }
+  }
+
+  /**
+   * 載入並初始化 barcode-detector polyfill（zxing-wasm）
+   * 首次呼叫會從 CDN 下載 WASM，後續呼叫僅重建 detector
+   */
+  async initPolyfillDetector() {
+    if (this._polyfillLoading) return;
+    this._polyfillLoading = true;
+    try {
+      if (!this._polyfillClass) {
+        console.log('[Scanner] 正在載入 barcode-detector polyfill (zxing-wasm)...');
+        const mod = await import('https://esm.sh/barcode-detector/pure');
+        this._polyfillClass = mod.BarcodeDetector;
+        console.log('[Scanner] polyfill WASM 已載入');
+      }
+      // 內部格式用 pdf_417，標準 API 用 pdf417
+      const formatMap = { 'pdf_417': 'pdf417' };
+      const formats = this.config.allowedFormats.map(f => formatMap[f] || f);
+      this.polyfillDetector = new this._polyfillClass({ formats });
+      console.log('[Scanner] polyfill detector 就緒，格式:', formats);
+    } catch (e) {
+      console.error('[Scanner] polyfill 載入失敗:', e);
+      this.polyfillDetector = null;
+      if (this.onError) this.onError(new Error('Polyfill (zxing-wasm) 載入失敗: ' + e.message));
+    } finally {
+      this._polyfillLoading = false;
     }
   }
 
@@ -294,17 +332,38 @@ class BarcodeScannerCore {
       // 根據掃描模式選擇方法
       let results = [];
 
-      switch (this.config.scanMode) {
-        case 'pyramid':
-          results = await this.pyramidScan(canvas, ctx);
-          break;
-        case 'roi':
-          results = await this.roiScan(canvas, ctx);
-          break;
-        case 'single':
-        default:
-          results = await this.singleScan(canvas, ctx);
-          break;
+      if (this.config.decoderEngine === 'polyfill') {
+        // polyfill 引擎：直接全圖偵測（zxing-wasm 內建多尺度+旋轉，不需金字塔/掃描帶）
+        if (!this.polyfillDetector) return;
+        try {
+          const pResults = await this.polyfillDetector.detect(canvas);
+          results = pResults.map(pr => ({
+            format: this.normalizeFormat(pr.format),
+            rawValue: pr.rawValue,
+            boundingBox: pr.boundingBox ? {
+              x: pr.boundingBox.x, y: pr.boundingBox.y,
+              width: pr.boundingBox.width, height: pr.boundingBox.height
+            } : null,
+            cornerPoints: pr.cornerPoints || null,
+            confidence: 1,
+            source: 'polyfill'
+          }));
+        } catch (e) {
+          console.warn('[Scanner] polyfill 偵測錯誤:', e);
+        }
+      } else {
+        switch (this.config.scanMode) {
+          case 'pyramid':
+            results = await this.pyramidScan(canvas, ctx);
+            break;
+          case 'roi':
+            results = await this.roiScan(canvas, ctx);
+            break;
+          case 'single':
+          default:
+            results = await this.singleScan(canvas, ctx);
+            break;
+        }
       }
 
       // 座標映射：掃描畫布空間 → 原始影像空間
@@ -754,9 +813,17 @@ class BarcodeScannerCore {
       this.initCodeReader();
     }
 
-    // 引擎變更時重建原生偵測器
+    // 引擎變更時重建偵測器
     if (newConfig.decoderEngine !== undefined) {
       this.initNativeDetector();
+      if (newConfig.decoderEngine === 'polyfill') {
+        this.initPolyfillDetector(); // 非同步載入，就緒前 scanFrame 會跳過
+      }
+    }
+
+    // 格式變更時重建 polyfill detector（更新格式白名單）
+    if (newConfig.allowedFormats && this.config.decoderEngine === 'polyfill' && this._polyfillClass) {
+      this.initPolyfillDetector();
     }
 
     console.log('[Scanner] 設定已更新:', newConfig);
